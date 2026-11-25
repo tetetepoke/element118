@@ -40,13 +40,20 @@ document.addEventListener('touchend', (e) => {
   lastTouchEnd = now;
 }, { passive: false });
 document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-const refit = () => setTimeout(() => {
-  if (window.visualViewport && window.visualViewport.scale !== 1) window.scrollTo(0, 0);
-  game.scale.refresh();
-}, 120);
-window.visualViewport?.addEventListener('resize', refit);
+// Re-fit only when the page was zoomed (pinch that slipped through) or the phone was rotated.
+// Phaser already follows normal window resizes.
+let refitTimer = 0;
+const refit = () => {
+  clearTimeout(refitTimer);
+  refitTimer = window.setTimeout(() => {
+    if (window.visualViewport && Math.abs(window.visualViewport.scale - 1) > 0.01) window.scrollTo(0, 0);
+    game.scale.refresh();
+  }, 150);
+};
+window.visualViewport?.addEventListener('resize', () => {
+  if (window.visualViewport && Math.abs(window.visualViewport.scale - 1) > 0.01) refit();
+});
 window.addEventListener('orientationchange', refit);
-window.addEventListener('resize', refit);
 
 // for automated tests
 (window as unknown as { __game: Phaser.Game }).__game = game;

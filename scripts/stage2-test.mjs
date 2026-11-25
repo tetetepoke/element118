@@ -55,8 +55,12 @@ await G(() => {
 });
 await page.reload();
 await wait(1500);
-await page.mouse.click(1110, 590); // つづきから
-await wait(1800);
+await shot('00-title');
+for (let i = 0; i < 6 && !(await G(() => window.__game.scene.isActive('World'))); i++) {
+  await page.mouse.click(1110, 590); // つづきから
+  await wait(1500);
+}
+console.log('  scenes', await G(() => window.__game.scene.getScenes(true).map((s) => s.scene.key).join(',')));
 check(await G(() => window.__game.scene.isActive('World')), 'v1 save continues in stage 1');
 // walk onto the goal → StageClear → stage 2
 await G(() => { const w = window.__game.scene.getScene('World'); w.player.setPosition(24 * 16 + 8, 4 * 16 + 14); });
