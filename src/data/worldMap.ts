@@ -19,10 +19,20 @@ export interface EntityDef {
   props?: Record<string, string | number | boolean>;
 }
 
+export interface Building {
+  /** decor image key drawn over the footprint when real art is loaded */
+  key: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface WorldMap {
   ground: number[][];
   solid: number[][];
   entities: EntityDef[];
+  buildings: Building[];
 }
 
 function rng(seed: number) {
@@ -37,6 +47,7 @@ export function buildWorld(): WorldMap {
   const solid = Array.from({ length: H }, () => Array.from({ length: W }, () => -1));
   const reserved = Array.from({ length: H }, () => Array.from({ length: W }, () => false));
   const entities: EntityDef[] = [];
+  const buildings: Building[] = [];
 
   const setG = (x: number, y: number, t: number) => { if (x >= 0 && y >= 0 && x < W && y < H) ground[y][x] = t; };
   const setS = (x: number, y: number, t: number) => { if (x >= 0 && y >= 0 && x < W && y < H) solid[y][x] = t; };
@@ -61,7 +72,8 @@ export function buildWorld(): WorldMap {
   // ── Village (rows 77-97) ──
   rectG(6, 88, 41, 89, T.PATH);
   res(5, 87, 42, 90);
-  const house = (x: number, y: number, w: number, h: number) => {
+  const house = (x: number, y: number, w: number, h: number, key = 'house_a') => {
+    buildings.push({ key, x, y, w, h });
     for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) setS(xx, yy, yy < y + 2 ? T.ROOF : T.WALL);
     const doorX = x + Math.floor(w / 2);
     setS(doorX, y + h - 1, T.DOOR);
@@ -71,9 +83,9 @@ export function buildWorld(): WorldMap {
     return doorX;
   };
   house(8, 82, 7, 4); // Carbon's house, door (11,85)
-  house(31, 80, 8, 4); // elder
-  house(13, 91, 6, 4);
-  house(31, 92, 7, 4);
+  house(31, 80, 8, 4, 'house_b'); // elder
+  house(13, 91, 6, 4, 'house_c');
+  house(31, 92, 7, 4, 'house_c');
   // flower beds
   for (let i = 0; i < 40; i++) {
     const x = 3 + Math.floor(r() * (W - 6)), y = 78 + Math.floor(r() * 19);
@@ -132,6 +144,7 @@ export function buildWorld(): WorldMap {
   // windmill building
   for (let y = 21; y <= 25; y++) for (let x = 30; x <= 35; x++) setS(x, y, y <= 22 ? T.MILL_ROOF : T.MILL_WALL);
   setS(32, 25, T.DOOR);
+  buildings.push({ key: 'windmill', x: 30, y: 21, w: 6, h: 5 });
   res(29, 20, 36, 27);
   ent({ type: 'npc', id: 'oxy', x: 28, y: 28, props: { sprite: 'oxy' } });
   ent({ type: 'crystal', id: 'o_a', x: 18, y: 27, props: { element: 'O', respawn: true } });
@@ -191,7 +204,7 @@ export function buildWorld(): WorldMap {
   for (const [x, y] of [[42, 58], [43, 58], [44, 58], [42, 60], [43, 60], [44, 60], [44, 59]]) setS(x, y, T.TREE);
   setS(42, 59, -1);
   setS(41, 59, -1);
-  return { ground, solid, entities };
+  return { ground, solid, entities, buildings };
 }
 
 function isBuilding(t: number) {

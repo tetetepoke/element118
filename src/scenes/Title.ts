@@ -34,12 +34,27 @@ export class Title extends Phaser.Scene {
       this.tweens.add({ targets: c, y: y - 30, duration: 2000 + Math.random() * 2000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     }
 
-    const carbon = this.add.sprite(GAME_W / 2 - 300, 470, 'carbon', 0).setScale(7);
-    carbon.play('carbon_idle_down');
+    if (this.textures.exists('keyart')) {
+      // key visual from the concept sheet
+      const art = this.add.image(0, 0, 'keyart').setOrigin(0, 0);
+      const s = Math.max(GAME_W / art.width, GAME_H / art.height);
+      art.setScale(s);
+      art.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+    } else {
+      const carbon = this.add.sprite(GAME_W / 2 - 300, 470, 'carbon', 0).setScale(7);
+      carbon.play('carbon_idle_down');
+    }
 
+    const hasArt = this.textures.exists('keyart');
+    const bx = hasArt ? GAME_W - 330 : GAME_W / 2 + 120;
+    if (hasArt) {
+      this.add.rectangle(bx, GAME_H - 160, 520, 300, 0x0e1630, 0.55).setOrigin(0.5);
+      txt(this, bx, GAME_H - 290, STAGE_LABEL, 24, '#ffffff').setOrigin(0.5);
+    } else {
     txt(this, GAME_W / 2 + 120, 200, 'ELEMENT 118', 104, '#ffffff', { fontStyle: 'bold', stroke: '#1b2a55', strokeThickness: 10 }).setOrigin(0.5);
     txt(this, GAME_W / 2 + 120, 290, '— エレメント118 —', 36, '#1b2a55').setOrigin(0.5);
     txt(this, GAME_W / 2 + 120, 340, STAGE_LABEL, 26, '#1b2a55').setOrigin(0.5);
+    }
 
     const start = (cont: boolean) => {
       unlockAudio();
@@ -55,12 +70,12 @@ export class Title extends Phaser.Scene {
     };
 
     const saved = hasSave();
-    let y = 470;
+    let y = hasArt ? GAME_H - 220 : 470;
     if (saved) {
-      button(this, GAME_W / 2 + 120, y, 420, 84, 'つづきから', () => start(true), 0x2a6a4a, 34);
-      y += 110;
+      button(this, bx, y, 420, 84, 'つづきから', () => start(true), 0x2a6a4a, 34);
+      y += hasArt ? 100 : 110;
     }
-    const newBtn = button(this, GAME_W / 2 + 120, y, 420, 84, saved ? 'はじめから' : 'はじめる', () => {
+    const newBtn = button(this, bx, y, 420, 84, saved ? 'はじめから' : 'はじめる', () => {
       if (saved && !confirmPending) {
         confirmPending = true;
         newBtn.setLabel('もう一度押すと上書き');
@@ -75,8 +90,8 @@ export class Title extends Phaser.Scene {
     }, 0x2a3a66, 34);
     let confirmPending = false;
 
-    txt(this, 24, GAME_H - 40, `v${VERSION}　仮素材プロトタイプ`, 20, '#1b2a55');
-    txt(this, GAME_W - 24, GAME_H - 40, 'iPhoneは横向きで / ホーム画面に追加すると全画面', 20, '#1b2a55').setOrigin(1, 0);
+    txt(this, 24, GAME_H - 40, `v${VERSION}　プロトタイプ`, 20, hasArt ? '#ffffff' : '#1b2a55', hasArt ? { backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 8, y: 3 } } : {});
+    if (!hasArt) txt(this, GAME_W - 24, GAME_H - 40, 'iPhoneは横向きで / ホーム画面に追加すると全画面', 20, '#1b2a55').setOrigin(1, 0);
 
     // iOS needs a gesture to unlock audio; any tap does it.
     this.input.once('pointerdown', () => unlockAudio());

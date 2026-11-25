@@ -4,10 +4,12 @@ import Phaser from 'phaser';
 
 export interface SpriteOverride {
   file: string; // relative to public/assets/
-  frameWidth: number;
-  frameHeight: number;
+  frameWidth?: number;
+  frameHeight?: number;
   /** Player sheet only: 4 (down/up/side) or 8 (down/up/side/down_side/up_side). */
   directions?: 4 | 8;
+  /** "image" for single pictures (title art, buildings); default is a sprite sheet. */
+  type?: 'image' | 'sheet';
 }
 
 export type AssetManifest = Record<string, SpriteOverride>;
@@ -19,8 +21,9 @@ export function queueOverrides(scene: Phaser.Scene, manifest: AssetManifest): Se
   const loaded = new Set<string>();
   for (const [key, o] of Object.entries(manifest)) {
     if (!o || typeof o.file !== 'string' || key.startsWith('_')) continue;
-    if (key === 'tiles') scene.load.image(key, `assets/${o.file}`);
-    else scene.load.spritesheet(key, `assets/${o.file}`, { frameWidth: o.frameWidth, frameHeight: o.frameHeight });
+    const url = o.file.startsWith('data:') ? o.file : `assets/${o.file}`;
+    if (key === 'tiles' || o.type === 'image') scene.load.image(key, url);
+    else scene.load.spritesheet(key, url, { frameWidth: o.frameWidth ?? 32, frameHeight: o.frameHeight ?? 32 });
     if (o.directions) spriteDirections[key] = o.directions;
     loaded.add(key);
   }

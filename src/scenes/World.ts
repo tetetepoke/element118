@@ -98,6 +98,14 @@ export class World extends Phaser.Scene {
     this.player.onSwing = (x, y, r, step) => this.onSwing(x, y, r, step);
     this.player.onDust = (x, y) => this.burst('px_dust', x, y, 3, 20, 300);
 
+    // real building art (from the concept sheet) drawn over the solid footprint
+    for (const b of wm.buildings) {
+      if (!this.textures.exists(b.key)) continue;
+      const img = this.add.image(b.x * TILE + (b.w * TILE) / 2, (b.y + b.h) * TILE + 2, b.key).setOrigin(0.5, 1);
+      const scale = Math.min(((b.w + 1) * TILE) / img.width, ((b.h + 2.2) * TILE) / img.height);
+      img.setScale(scale).setDepth((b.y + b.h) * TILE - 1);
+      this.solidLayer.forEachTile((t) => t.setVisible(false), undefined, b.x, b.y, b.w, b.h);
+    }
     for (const e of wm.entities) this.spawn(e);
 
     this.physics.add.collider(this.player, this.solidLayer);

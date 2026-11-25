@@ -12,11 +12,13 @@ export class Boot extends Phaser.Scene {
 
   preload() {
     txt(this, GAME_W / 2, GAME_H / 2, 'よみこみ中…', 32).setOrigin(0.5);
-    this.load.json('assetManifest', 'assets/manifest.json');
+    // the single-file HTML build embeds its manifest (with data: URLs) instead of fetching it
+    if (!(window as unknown as { __E118_MANIFEST?: unknown }).__E118_MANIFEST) this.load.json('assetManifest', 'assets/manifest.json');
   }
 
   create() {
-    const manifest = (this.cache.json.get('assetManifest') ?? {}) as AssetManifest;
+    const embedded = (window as unknown as { __E118_MANIFEST?: AssetManifest }).__E118_MANIFEST;
+    const manifest = (embedded ?? this.cache.json.get('assetManifest') ?? {}) as AssetManifest;
     const real = queueOverrides(this, manifest);
     const finish = () => {
       makeAllPlaceholders(this, real);

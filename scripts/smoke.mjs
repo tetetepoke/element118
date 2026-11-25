@@ -50,7 +50,7 @@ async function hold(key, ms) { await page.keyboard.down(key); await wait(ms); aw
 
 await wait(1500);
 await shot('01-title');
-await tapCanvas(840, 470); // はじめる
+await tapCanvas(1110, 590); // はじめる
 await wait(1200);
 await shot('02-intro');
 await advanceDialogue();
@@ -242,7 +242,7 @@ console.log('active scenes:', await active());
 await page.reload();
 await wait(1500);
 await shot('36-title-continue');
-await tapCanvas(840, 470); // つづきから
+await tapCanvas(1110, 590); // つづきから
 await wait(1500);
 await shot('37-continued');
 
