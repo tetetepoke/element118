@@ -370,19 +370,21 @@ def main():
     traced = {k: [clean(a) for a in v] for k, v in traced.items()}
     back = clean(back)
 
-    # 2. pick frames for each animation (source faces left)
+    # 2. the sheet mixes directions: 待機・歩行 look RIGHT, 攻撃・回避・ガード look LEFT.
+    #    Normalise every frame to look RIGHT first (otherwise he walks backwards).
+    flipA = lambda a: a[:, ::-1].copy()
     idle = traced['idle']
     walk = traced['walk']
-    atk = traced['atk']
-    dodge = traced['dodge']
-    guard = traced['guard']
-    left_seq = [idle[0], idle[1], walk[0], walk[1], walk[3], walk[4], atk[0], atk[1], atk[2],
-                dodge[2], guard[0], dodge[0], idle[2], idle[3]]
+    atk = [flipA(a) for a in traced['atk']]
+    dodge = [flipA(a) for a in traced['dodge']]
+    guard = [flipA(a) for a in traced['guard']]
+    right_seq = [idle[0], idle[1], walk[0], walk[1], walk[3], walk[4], atk[0], atk[1], atk[2],
+                 dodge[2], guard[0], dodge[0], idle[2], idle[3]]
     down_seq = [idle[0], idle[1], walk[0], walk[2], walk[3], walk[5], atk[0], atk[1], atk[2],
                 dodge[2], guard[0], dodge[0], idle[2], idle[3]]
-    left_frames = [place(a) for a in left_seq]
+    right_frames = [place(a) for a in right_seq]
     down_frames = [place(a) for a in down_seq]
-    right_frames = [f.transpose(Image.FLIP_LEFT_RIGHT) for f in left_frames]
+    left_frames = [f.transpose(Image.FLIP_LEFT_RIGHT) for f in right_frames]
     bf = place(back)
     ba = np.array(bf)
     def lift(a, left):
@@ -419,19 +421,21 @@ def main():
         return s
 
     plain = sheet([down_frames, up_frames, right_frames, left_frames])
-    # face boxes (x0, y0, x1, y1) on the traced left-facing frames, set by eye on the 32x32 grid
-    FACE_LEFT = [(11, 12, 22, 22), (10, 13, 22, 23), (9, 13, 20, 23), (10, 14, 21, 24), (10, 14, 21, 24),
-                 (11, 13, 22, 23), (11, 14, 20, 22), (9, 14, 19, 23), (12, 14, 22, 24), (12, 16, 21, 24),
-                 (9, 15, 19, 23), (7, 16, 17, 24), (11, 12, 23, 22), (11, 12, 22, 22)]
-    FACE_DOWN = list(FACE_LEFT)
-    FACE_DOWN[3], FACE_DOWN[5] = (10, 14, 21, 24), (11, 13, 22, 23)   # walk[2], walk[5]
+    # face boxes (x0, y0, x1, y1) set by eye on the traced 32x32 frames as they come from the sheet
+    # (cols 6-11 come from left-looking rows, so their boxes are mirrored after normalising)
     mirror = lambda b: (FW - 1 - b[2], b[1], FW - 1 - b[0], b[3])
+    FACE_SHEET = [(11, 12, 22, 22), (10, 13, 22, 23), (9, 13, 20, 23), (10, 14, 21, 24), (10, 14, 21, 24),
+                  (11, 13, 22, 23), (11, 14, 20, 22), (9, 14, 19, 23), (12, 14, 22, 24), (12, 16, 21, 24),
+                  (9, 15, 19, 23), (7, 16, 17, 24), (11, 12, 23, 22), (11, 12, 22, 22)]
+    FACE_RIGHT = [mirror(b) if 6 <= i <= 11 else b for i, b in enumerate(FACE_SHEET)]
+    FACE_DOWN = list(FACE_RIGHT)
+    FACE_DOWN[3], FACE_DOWN[5] = (10, 14, 21, 24), (11, 13, 22, 23)   # walk[2], walk[5]
 
     def mask_row(frames, boxes, left):
         return [put_mask(f, left, b, force=True)[0] for f, b in zip(frames, boxes)]
-    masked_down = mask_row(down_frames, FACE_DOWN, True)
-    masked_left = mask_row(left_frames, FACE_LEFT, True)
-    masked_right = mask_row(right_frames, [mirror(b) for b in FACE_LEFT], False)
+    masked_down = mask_row(down_frames, FACE_DOWN, False)
+    masked_right = mask_row(right_frames, FACE_RIGHT, False)
+    masked_left = mask_row(left_frames, [mirror(b) for b in FACE_RIGHT], True)
     masked_up = []
     for f in up_frames:  # mask strap across the back of the head
         g = f.copy()
