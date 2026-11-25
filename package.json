@@ -1,0 +1,25 @@
+{
+  "name": "element118",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ELEMENT 118 — 元素の結合で世界を解き明かす見下ろし型探索アクション（第一段階プロトタイプ）",
+  "scripts": {
+    "dev": "vite",
+    "validate": "tsx scripts/validate-data.ts",
+    "test": "tsx scripts/test-bonding.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run validate && npm run test && tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.7",
+    "playwright-core": "^1.65.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}

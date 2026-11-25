@@ -1,0 +1,28 @@
+import Phaser from 'phaser';
+import { GAME_W, GAME_H } from './config';
+import { Boot } from './scenes/Boot';
+import { Title } from './scenes/Title';
+import { World } from './scenes/World';
+import { UI } from './scenes/UI';
+import { BondPanel } from './scenes/BondPanel';
+import { Ceremony } from './scenes/Ceremony';
+import { Codex } from './scenes/Codex';
+import { Menu } from './scenes/Menu';
+import { StageClear } from './scenes/StageClear';
+
+const game = new Phaser.Game({
+  type: Phaser.AUTO,
+  parent: 'game',
+  width: GAME_W,
+  height: GAME_H,
+  backgroundColor: '#14182a',
+  antialias: false,
+  roundPixels: true,
+  physics: { default: 'arcade', arcade: { debug: false } },
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  input: { activePointers: 4 },
+  scene: [Boot, Title, World, UI, BondPanel, Ceremony, Codex, Menu, StageClear],
+});
+
+// for automated tests
+(window as unknown as { __game: Phaser.Game }).__game = game;
