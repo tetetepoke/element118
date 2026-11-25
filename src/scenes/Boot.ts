@@ -39,20 +39,25 @@ export class Boot extends Phaser.Scene {
     const a = this.anims;
     const rows8 = ['down', 'up', 'side', 'down_side', 'up_side'];
     const dirs = spriteDirections.carbon ?? 4;
-    const rows = rows8.slice(0, dirs === 8 ? 5 : 3);
     const rates: Record<string, number> = { idle: 2.5, walk: 9, attack: 16, dodge: 10, guard: 1, hurt: 1, bond: 4 };
-    rows.forEach((row, ri) => {
-      for (const [name, cols] of Object.entries(CARBON_ANIMS)) {
-        const key = `carbon_${name}_${row}`;
-        if (a.exists(key)) a.remove(key);
-        a.create({
-          key,
-          frames: cols.map((c) => ({ key: 'carbon', frame: ri * CARBON_COLS + c })),
-          frameRate: rates[name],
-          repeat: name === 'attack' || name === 'hurt' ? 0 : -1,
-        });
-      }
-    });
+    // 'carbon' = face showing, 'carbonm' = mask on (falls back to 'carbon' if not provided).
+    // A 4-direction sheet may carry a 4th row 'side_left' so text on the mask is never mirrored.
+    for (const [prefix, tex] of [['carbon', 'carbon'], ['carbonm', this.textures.exists('carbonm') ? 'carbonm' : 'carbon']]) {
+      const rowCount = Math.floor((this.textures.get(tex).frameTotal - 1) / CARBON_COLS);
+      const rows = dirs === 8 ? rows8 : rowCount >= 4 ? ['down', 'up', 'side', 'side_left'] : ['down', 'up', 'side'];
+      rows.forEach((row, ri) => {
+        for (const [name, cols] of Object.entries(CARBON_ANIMS)) {
+          const key = `${prefix}_${name}_${row}`;
+          if (a.exists(key)) a.remove(key);
+          a.create({
+            key,
+            frames: cols.map((c) => ({ key: tex, frame: ri * CARBON_COLS + c })),
+            frameRate: rates[name],
+            repeat: name === 'attack' || name === 'hurt' ? 0 : -1,
+          });
+        }
+      });
+    }
     for (const k of ['hyde', 'oxy', 'elder', 'villager']) {
       // 4 frames = one row (down only); 12 frames = rows down / up / side
       const total = this.textures.get(k).frameTotal - 1;

@@ -80,25 +80,24 @@
     "frameWidth": 32,
     "frameHeight": 32,
     "directions": 4,
-    "source": "scripts/draw-carbon.py (redrawn, grid-exact)"
+    "source": "scripts/trace-carbon.py (traced from the design reference onto a 32x32 grid)"
   },
   "pt_carbon": {
     "file": "sprites/pt_carbon.png",
     "frameWidth": 192,
     "frameHeight": 192,
-    "source": "scripts/draw-carbon.py (carbon_faces x6)"
+    "source": "scripts/trace-carbon.py (traced from the design reference onto a 32x32 grid)"
   },
   "pt_carbon_shy": {
     "file": "sprites/pt_carbon_shy.png",
     "frameWidth": 192,
     "frameHeight": 192,
-    "source": "scripts/draw-carbon.py (carbon_faces x6)"
+    "source": "scripts/trace-carbon.py (traced from the design reference onto a 32x32 grid)"
   },
   "carbon_faces": {
     "file": "sprites/carbon_faces.png",
     "frameWidth": 32,
     "frameHeight": 32,
-    "source": "scripts/draw-carbon.py",
     "order": [
       "normal",
       "smile",
@@ -109,6 +108,14 @@
       "shy",
       "cry",
       "idea"
-    ]
+    ],
+    "source": "scripts/trace-carbon.py (traced from the design reference onto a 32x32 grid)"
+  },
+  "carbonm": {
+    "file": "sprites/carbonm.png",
+    "frameWidth": 32,
+    "frameHeight": 32,
+    "directions": 4,
+    "source": "scripts/trace-carbon.py (traced from the design reference onto a 32x32 grid)"
   }
 }

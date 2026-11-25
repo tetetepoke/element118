@@ -333,6 +333,7 @@ export class World extends Phaser.Scene {
     this.player.setDepth(this.player.y);
 
     for (const en of this.enemies) en.update(time, this.player.x, this.player.y);
+    this.updateMask();
     this.updateFollowers();
     this.checkCrystals();
     this.checkTriggers();
@@ -595,6 +596,22 @@ export class World extends Phaser.Scene {
     }
     this.makeFollower(id);
     sfx('discover');
+  }
+
+  /** Carbon is shy: the mask goes on when a person (not a party member) or an enemy comes close. */
+  private updateMask() {
+    const p = this.player;
+    const on = p.masked;
+    const near = (x: number, y: number, r: number) => Math.hypot(x - p.x, y - p.y) < r;
+    const rPerson = on ? 64 : 44; // hysteresis so it does not flicker at the edge
+    const rEnemy = on ? 92 : 68;
+    let want = false;
+    for (const [id, n] of this.npcs) {
+      if (!n.visible || this.followers.some((f) => f.id === id)) continue;
+      if (near(n.x, n.y, rPerson)) { want = true; break; }
+    }
+    if (!want) want = this.enemies.some((en) => !en.dead && en.active && near(en.x, en.y, rEnemy));
+    p.setMasked(want);
   }
 
   private makeFollower(id: string) {

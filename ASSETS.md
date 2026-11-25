@@ -21,7 +21,7 @@
 
 | キー | 1コマ | 配置 |
 | --- | --- | --- |
-| `carbon`（主人公） | 32×32 | 行：0 下向き、1 上向き、2 横向き（右）。8方向にするときは 3 斜め下（右下）、4 斜め上（右上）を追加し `"directions": 8`。列：0-1 待機、2-5 歩行、6-8 攻撃、9 回避、10 ガード（鍋ぶたの盾）、11 被ダメージ、12-13 BOND |
+| `carbon`（主人公・顔出し）`carbonm`（お面。人や敵が近いとき） | 32×32 | 行：0 下向き、1 上向き、2 右向き、3 左向き（任意。あると反転しない）。8方向にするときは 3 斜め下（右下）、4 斜め上（右上）を追加し `"directions": 8`。列：0-1 待機、2-5 歩行、6-8 攻撃、9 回避、10 ガード（鍋ぶたの盾）、11 被ダメージ、12-13 BOND |
 | `hyde` `oxy` `elder` `villager` | 32×32 | 1行：0-1 待機、2-3 歩行 |
 | `breakling`（敵） | 32×32 | 0-1 移動、2 被弾、3 気絶 |
 | `tiles` | 16×16 | 横16枚×縦4段。0〜15は歩ける床、16以降はぶつかる物。番号は `placeholders.ts` の `T` を参照 |
@@ -50,7 +50,7 @@
 
 ## 今の素材の出どころ
 
-カーボン（`carbon` `carbon_faces` `pt_carbon` `pt_carbon_shy`）は `python3 scripts/draw-carbon.py` が1ドットずつ描いています（シートからの切り出しではありません）。拡大確認用の画像は `art/sprites-src/carbon_preview_x8.png` と `carbon_faces_preview_x8.png`。
+カーボン（`carbon` 顔出し、`carbonm` お面、`carbon_faces`、`pt_carbon` `pt_carbon_shy`）は `python3 scripts/trace-carbon.py` が基準画像を下絵にして32×32のマスへ描き直しています。拡大確認用は `art/sprites-src/carbon_preview_x8.png` `carbonm_preview_x8.png` `carbon_faces_preview_x8.png`。
 
 それ以外は `python3 scripts/extract-sprites.py` が2枚のシートから切り出しています（人物は **暫定版**。描き直し版ができたものから差し替えます）。このスクリプトは、描き直し済みのファイルには触れません。
 

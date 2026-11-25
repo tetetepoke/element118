@@ -45,11 +45,33 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this.y;
   }
 
+  /** Shy: puts the mask on when people or enemies are close (World decides). */
+  masked = false;
+  private lastAnim = 'idle';
+
   private play8(name: string) {
-    const [row, flip] = spriteRowFor(this.facing, spriteDirections.carbon ?? 4);
+    this.lastAnim = name;
+    let [row, flip] = spriteRowFor(this.facing, spriteDirections.carbon ?? 4);
+    const prefix = this.masked ? 'carbonm' : 'carbon';
+    if (row === 'side' && flip && this.scene.anims.exists(`${prefix}_${name}_side_left`)) {
+      row = 'side_left' as typeof row;
+      flip = false;
+    }
     this.setFlipX(flip);
-    const key = `carbon_${name}_${row}`;
-    if (this.anims.currentAnim?.key !== key) this.play(key, true);
+    const key = `${prefix}_${name}_${row}`;
+    const cur = this.anims.currentAnim?.key;
+    if (cur === key) return;
+    // swapping mask on/off mid-animation keeps the frame position
+    const sameAnim = cur && cur.replace(/^carbonm?_/, '') === key.replace(/^carbonm?_/, '');
+    const progress = sameAnim ? this.anims.getProgress() : 0;
+    this.play(key, true);
+    if (sameAnim && progress > 0) this.anims.setProgress(progress);
+  }
+
+  setMasked(v: boolean) {
+    if (v === this.masked) return;
+    this.masked = v;
+    this.play8(this.lastAnim);
   }
 
   lock(v: boolean) {

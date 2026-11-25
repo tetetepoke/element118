@@ -116,7 +116,8 @@ for (const file of walk('src')) {
   if (/localStorage|sessionStorage|indexedDB/.test(text)) err(`${file}: storage access outside src/core/storage.ts`);
 }
 
-// 6. Character design reference (docs/CHARACTER_DESIGN.md): kept byte-for-byte, never shipped or cut up.
+// 6. Character design reference (docs/CHARACTER_DESIGN.md): kept byte-for-byte and never shipped.
+//    Only the tracing scripts (scripts/trace-*.py) may open it, read-only, as an underdrawing.
 const REF = 'art/reference/character-design-reference.png';
 const REF_SHA256 = '2b09ca700caeadd5911caccf699a352c03318cd6a7a504a56fe78011aec2eeba';
 if (!existsSync(REF)) err(`${REF} is missing`);
@@ -124,7 +125,8 @@ else if (createHash('sha256').update(readFileSync(REF)).digest('hex') !== REF_SH
   err(`${REF} has been changed (re-encoded, resized or overwritten). Restore the original PNG.`);
 for (const file of [...walk('src'), ...walk('scripts'), ...walk('public'), 'index.html', 'vite.config.ts']) {
   if (!/\.(ts|js|mjs|py|html|json)$/.test(file) || file.endsWith('validate-data.ts')) continue;
-  if (/character-design-reference/.test(readFileSync(file, 'utf8'))) err(`${file}: the design reference must not be used by the game or cut into sprites`);
+  if (/scripts[\\/]trace-[\w-]+\.py$/.test(file)) continue;
+  if (/character-design-reference/.test(readFileSync(file, 'utf8'))) err(`${file}: the design reference may only be read by scripts/trace-*.py`);
 }
 for (const file of walk('public')) {
   if (/\.png$/.test(file) && createHash('sha256').update(readFileSync(file)).digest('hex') === REF_SHA256)
