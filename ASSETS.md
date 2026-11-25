@@ -37,6 +37,10 @@
 | `slash`（攻撃の軌跡、右向きで描く） | 32×32 | 3コマ |
 | `pt_carbon` `pt_carbon_shy` `pt_hyde` `pt_oxy` `pt_elder` `pt_villager`（会話の顔） | 192×192 | 1コマ |
 
+## キャラクターデザインの基準
+
+正式な基準画像は `art/reference/character-design-reference.png`、ルールは **[docs/CHARACTER_DESIGN.md](docs/CHARACTER_DESIGN.md)** にあります。基準画像は見本専用で、ゲーム用に切り出しません。人物スプライトはキャラクターごとにグリッドで描き直した個別PNGへ順に置き換えます。
+
 ## 主人公カーボンの見た目のルール
 
 - 恥ずかしがり屋。お面（「C」と「6」入り）をつけている。
@@ -45,7 +49,7 @@
 
 ## 今の素材の出どころ
 
-`python3 scripts/extract-sprites.py` が2枚のシートから切り出しています。
+`python3 scripts/extract-sprites.py` が2枚のシートから切り出しています（人物は **暫定版**。描き直し版ができたものから差し替えます）。
 
 - `art/source/character-sheet.png`（キャラクター スプライトシート）：カーボン、ハイド、オキシ、村長、村人、会話の顔
 - `art/source/concept-sheet.png`（世界観シート）：地面タイル、木・岩・柵、家と風車、HとOの結晶、タイトル絵

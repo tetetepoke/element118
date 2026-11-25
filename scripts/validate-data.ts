@@ -1,5 +1,6 @@
 // Build-time data checks (design doc §6 and §0 rules). Fails the build on any problem.
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { ELEMENTS, element } from '../src/data/elements';
 import { SUBSTANCES, REACTIONS, compositionKey, substanceByComposition } from '../src/data/substances';
@@ -113,6 +114,21 @@ for (const file of walk('src')) {
     continue;
   }
   if (/localStorage|sessionStorage|indexedDB/.test(text)) err(`${file}: storage access outside src/core/storage.ts`);
+}
+
+// 6. Character design reference (docs/CHARACTER_DESIGN.md): kept byte-for-byte, never shipped or cut up.
+const REF = 'art/reference/character-design-reference.png';
+const REF_SHA256 = '2b09ca700caeadd5911caccf699a352c03318cd6a7a504a56fe78011aec2eeba';
+if (!existsSync(REF)) err(`${REF} is missing`);
+else if (createHash('sha256').update(readFileSync(REF)).digest('hex') !== REF_SHA256)
+  err(`${REF} has been changed (re-encoded, resized or overwritten). Restore the original PNG.`);
+for (const file of [...walk('src'), ...walk('scripts'), ...walk('public'), 'index.html', 'vite.config.ts']) {
+  if (!/\.(ts|js|mjs|py|html|json)$/.test(file) || file.endsWith('validate-data.ts')) continue;
+  if (/character-design-reference/.test(readFileSync(file, 'utf8'))) err(`${file}: the design reference must not be used by the game or cut into sprites`);
+}
+for (const file of walk('public')) {
+  if (/\.png$/.test(file) && createHash('sha256').update(readFileSync(file)).digest('hex') === REF_SHA256)
+    err(`${file}: copy of the design reference inside public/`);
 }
 
 if (errors.length) {

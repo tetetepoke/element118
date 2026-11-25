@@ -71,3 +71,4 @@ scripts/
 ## 素材の差し替え
 
 [ASSETS.md](ASSETS.md) を参照。PNGを置いて `public/assets/manifest.json` に1行書くだけで、仮素材と入れ替わります。
+キャラクターの見た目は [docs/CHARACTER_DESIGN.md](docs/CHARACTER_DESIGN.md)（正式な基準画像：`art/reference/character-design-reference.png`）に合わせます。
