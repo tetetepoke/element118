@@ -58,3 +58,21 @@
 - `art/source/concept-sheet.png`（世界観シート）：地面タイル、木・岩・柵、家と風車、HとOの結晶、タイトル絵
 
 会話の顔は、ゲーム内のキャラ（32ドット）と同じ粗さに揃えるため、一度32×32ドットに縮めてから6倍に拡大しています。
+
+## ステージ2（珪晶の谷）の素材
+
+`python3 scripts/trace-stage2.py` が `art/reference/stage2-design-reference.png` を下絵にして描き直します。まだのものは `src/assets/stage2Placeholders.ts` がコードで描いた仮素材で、同じキー・同じコマ配置のPNGを manifest に足せば差し替わります。
+
+| キー | 1コマ | 配置 |
+| --- | --- | --- |
+| `silica`（シリカ）`sic`（SiC FORM） | 32×32 | カーボンと同じ14列×4行（下・上・右・左） |
+| `pt_silica` `pt_researcher` `pt_miner` | 192×192 | 会話の顔（32×32を6倍） |
+| `cslime` `golem` `beetle` `drill` | 32×32 | 0-1 移動、2 被弾、3 気絶 |
+| `boss_cb`（クリスタル・ブレイカー） | 96×96 | 0-1 外殻、2 外殻が割れて中心がむき出し、3 停止 |
+| `tiles2` | 16×16 | 横16枚×2段。0〜15は歩ける床（5 = 熱い地帯）、16以降はぶつかる物。番号は `stage2Placeholders.ts` の `T2` |
+| `hardrock` | 16×16 | 0 そのまま、1 ひび |
+| `plate` `gate` | 16×16 | 0 / 1（押されていない・押された／閉・開） |
+| `monument`（元素碑） `terminal` `console` | 16×32 | 2コマ（console：0 停止、1 作動） |
+| `unknown_device`（電気が必要な装置） | 32×32 | 0 停止、1 作動 |
+| `crystal_deco` | 16×32 | 1コマ |
+| `shard`（結晶の弾） | 8×8 | 1コマ |

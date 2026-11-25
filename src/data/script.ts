@@ -1,7 +1,7 @@
 // All story text for stage 1. Carbon is shy, wears a mask with "C / 6", and starts out
 // with worn, unfinished gear — the lines below keep that character.
 
-export type Speaker = 'carbon' | 'carbon_shy' | 'hyde' | 'oxy' | 'elder' | 'villager' | 'sys';
+export type Speaker = 'carbon' | 'carbon_shy' | 'hyde' | 'oxy' | 'elder' | 'villager' | 'silica' | 'researcher' | 'miner' | 'record' | 'sys';
 
 export interface Line {
   who: Speaker;
@@ -15,6 +15,10 @@ export const SPEAKER_NAME: Record<Speaker, string> = {
   oxy: 'オキシ',
   elder: '村長',
   villager: '村人',
+  silica: 'シリカ',
+  researcher: '研究者',
+  miner: '鉱夫',
+  record: '古代研究所の記録',
   sys: '',
 };
 

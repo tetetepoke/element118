@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { makeAllPlaceholders, CARBON_ANIMS, CARBON_COLS } from '../assets/placeholders';
+import { makeStage2Placeholders } from '../assets/stage2Placeholders';
 import { AssetManifest, queueOverrides, spriteDirections } from '../assets/manifest';
 import { txt } from '../ui/widgets';
 import { GAME_W, GAME_H } from '../config';
@@ -22,6 +23,7 @@ export class Boot extends Phaser.Scene {
     const real = queueOverrides(this, manifest);
     const finish = () => {
       makeAllPlaceholders(this, real);
+      makeStage2Placeholders(this, real);
       this.buildAnims();
       this.scene.start('Title');
     };
@@ -57,6 +59,25 @@ export class Boot extends Phaser.Scene {
           });
         }
       });
+    }
+    // Stage 2: SiC FORM and Silica use Carbon's 14-column layout. Without art they borrow Carbon's frames.
+    for (const k of ['sic', 'silica']) {
+      const tex = this.textures.exists(k) ? k : 'carbon';
+      const rowCount = Math.floor((this.textures.get(tex).frameTotal - 1) / CARBON_COLS);
+      const rows = rowCount >= 4 ? ['down', 'up', 'side', 'side_left'] : ['down', 'up', 'side'];
+      rows.forEach((row, ri) => {
+        for (const [name, cols] of Object.entries(CARBON_ANIMS)) {
+          const key = `${k}_${name}_${row}`;
+          if (a.exists(key)) a.remove(key);
+          a.create({ key, frames: cols.map((c) => ({ key: tex, frame: ri * CARBON_COLS + c })), frameRate: rates[name], repeat: name === 'attack' || name === 'hurt' ? 0 : -1 });
+        }
+      });
+      if (!a.exists(`${k}_idle`)) a.create({ key: `${k}_idle`, frames: [0, 1].map((c) => ({ key: tex, frame: c })), frameRate: 2.5, repeat: -1 });
+    }
+    // Stage 2 enemies: 4 frames (move, move, hit, stun) like the breakling
+    for (const k of ['cslime', 'golem', 'beetle', 'drill']) {
+      if (!this.textures.exists(k) || a.exists(`${k}_move`)) continue;
+      a.create({ key: `${k}_move`, frames: a.generateFrameNumbers(k, { frames: [0, 1] }), frameRate: 4, repeat: -1 });
     }
     for (const k of ['hyde', 'oxy', 'elder', 'villager']) {
       // 4 frames = one row (down only); 12 frames = rows down / up / side

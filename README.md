@@ -55,6 +55,9 @@ scripts/
   validate-data.ts     データ検証（実在しない物質を作れないか、反応式の釣り合い、保存キーの制限など）
   test-bonding.ts      結合ルールのテスト
   smoke.mjs            ヘッドレスブラウザでの通しプレイテスト
+  stage2-test.mjs      ステージ2の通しプレイテスト（版1セーブからの引き継ぎ、BOND→BREAK、ボス、周期表）
+  facing-test.mjs      4方向に歩いて向きを確認
+  trace-carbon.py / trace-stage2.py   基準画像を下絵にして32×32へ描き直す
 ```
 
 ## 科学的な正確さのルール
@@ -71,4 +74,5 @@ scripts/
 ## 素材の差し替え
 
 [ASSETS.md](ASSETS.md) を参照。PNGを置いて `public/assets/manifest.json` に1行書くだけで、仮素材と入れ替わります。
+ステージ2「珪晶の谷」の設計と実装方針は [docs/STAGE2_PLAN.md](docs/STAGE2_PLAN.md)。
 キャラクターの見た目は [docs/CHARACTER_DESIGN.md](docs/CHARACTER_DESIGN.md)（正式な基準画像：`art/reference/character-design-reference.png`）に合わせます。

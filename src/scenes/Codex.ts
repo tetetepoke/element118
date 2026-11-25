@@ -144,24 +144,30 @@ export class Codex extends Phaser.Scene {
     c.add(this.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.55).setOrigin(0).setInteractive().on('pointerup', () => this.closeDetail()));
     c.add(panel(this, 120, 70, 1200, 680, 0x10152a, 0.99, kc));
     c.add(txt(this, 160, 96, `${s.formula}　${s.name.ja}（${s.name.en}）`, 44, '#ffffff', { fontStyle: 'bold' }));
-    c.add(txt(this, 160, 160, `【${KIND_LABEL[kindOf(s)]}】　${s.state}　材料：${Object.entries(s.composition).map(([k, n]) => `${k}原子${n}個`).join('、')}`, 24, '#' + kc.toString(16).padStart(6, '0')));
+    const made = s.structure === 'network'
+      ? `${Object.keys(s.composition).join('と')}が${Object.values(s.composition).join('：')}でつながった結晶`
+      : `材料：${Object.entries(s.composition).map(([k, n]) => `${k}原子${n}個`).join('、')}`;
+    c.add(txt(this, 160, 160, `【${KIND_LABEL[kindOf(s)]}】　${s.state}　${made}`, 24, '#' + kc.toString(16).padStart(6, '0')));
     let y = 214;
+    const total = s.properties.length + s.facts.length + s.gameNotes.length + s.dangers.length + (s.realProcess ? 1 : 0);
+    const fs = total > 9 ? 18 : 22;
     const section = (title: string, lines: string[], color: string, titleColor = '#ffd84a') => {
       if (!lines.length) return;
-      c.add(txt(this, 160, y, title, 24, titleColor, { fontStyle: 'bold' }));
-      y += 36;
+      c.add(txt(this, 160, y, title, fs + 2, titleColor, { fontStyle: 'bold' }));
+      y += fs + 12;
       lines.forEach((l) => {
-        const t = txt(this, 180, y, `・${l}`, 22, color, { wordWrap: { width: 1080, useAdvancedWrap: true } });
+        const t = txt(this, 180, y, `・${l}`, fs, color, { wordWrap: { width: 1080, useAdvancedWrap: true } });
         c.add(t);
-        y += t.height + 6;
+        y += t.height + (fs > 20 ? 6 : 3);
       });
-      y += 10;
+      y += fs > 20 ? 10 : 6;
     };
-    if (s.reviewed || SHOW_UNREVIEWED_FACTS) section('わかっていること', [...s.properties.map((p) => p), ...s.facts], '#ffffff');
-    section('ゲームのルール（現実とはちがう簡略化）', s.gameNotes, '#9fe0b8', '#9fe0b8');
+    if (s.reviewed || SHOW_UNREVIEWED_FACTS) section(s.obtainedBy === 'character' ? '本物の科学（わかっていること）' : 'わかっていること', [...s.properties.map((p) => p), ...s.facts], '#ffffff');
+    section(s.obtainedBy === 'character' ? 'ゲームの中の能力（フィクション・本物の性質とは別）' : 'ゲームのルール（現実とはちがう簡略化）', s.gameNotes, '#9fe0b8', '#9fe0b8');
     section('注意', s.dangers, '#ffb4b4', '#ff8a8a');
     if (s.realProcess) section('ほんとうは？', [s.realProcess], '#ffffff');
-    if (s.break.allowed && s.break.realMethod) section('分けるには', [`ゲームではBREAKで原子に戻せる。現実では${s.break.realMethod}などで分けられる。`], '#cfe8ff');
+    if (s.obtainedBy === 'character' && s.break.realMethod) section('分けるには', [`ゲームではBREAKでカーボンとシリカに戻る。現実のSiCは${s.break.realMethod}。`], '#cfe8ff');
+    else if (s.break.allowed && s.break.realMethod) section('分けるには', [`ゲームではBREAKで原子に戻せる。現実では${s.break.realMethod}などで分けられる。`], '#cfe8ff');
     if (!s.reviewed) c.add(txt(this, 1300, 86, '監修前', 18, '#10152a', { backgroundColor: '#ffd84a', padding: { x: 8, y: 3 } }).setOrigin(1, 0));
     c.add(button(this, 1240, 712, 120, 52, 'もどる', () => this.closeDetail(), 0x3a3f55, 22).root);
     this.detail = c;

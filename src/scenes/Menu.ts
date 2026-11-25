@@ -23,14 +23,21 @@ export class Menu extends Phaser.Scene {
     txt(this, GAME_W / 2, 150, `プレイ時間 ${Math.floor(t / 60)}分${t % 60}秒　／　発見した元素 ${game.data.discovered.elements.length}`, 22, '#8fa5c8').setOrigin(0.5);
 
     const x = GAME_W / 2;
-    const codexBtn = button(this, x, 230, 460, 70, '元素図鑑', () => {
+    const codexBtn = button(this, x - 70, 230, 320, 70, '元素図鑑', () => {
       this.scene.pause();
       this.scene.launch('Codex', { returnTo: 'menu' });
       this.scene.bringToTop('Codex');
     }, 0x5a4a1a, 30);
     codexBtn.setEnabled(game.flag('got_codex'));
+    button(this, x + 300, 230, 120, 70, 'マップ', () => {
+      const world = this.scene.get(game.worldKey) as unknown as { autosave: () => void };
+      world.autosave();
+      this.scene.pause();
+      this.scene.launch('MapView');
+      this.scene.bringToTop('MapView');
+    }, 0x4a3a7a, 24);
     button(this, x, 320, 460, 70, 'セーブする', () => {
-      const world = this.scene.get('World') as unknown as { autosave: () => void };
+      const world = this.scene.get(game.worldKey) as unknown as { autosave: () => void };
       world.autosave();
       this.msg.setText(storage.get('save.slot1') ? 'セーブしました' : 'セーブできませんでした');
     }, 0x2a6a4a, 30);
@@ -39,10 +46,10 @@ export class Menu extends Phaser.Scene {
       soundBtn.setLabel(isMuted() ? '音：オフ' : '音：オン');
     }, 0x2a3a66, 30);
     button(this, x, 500, 460, 70, 'タイトルへもどる', () => {
-      const world = this.scene.get('World') as unknown as { autosave: () => void };
+      const world = this.scene.get(game.worldKey) as unknown as { autosave: () => void };
       world.autosave();
       this.scene.stop('UI');
-      this.scene.stop('World');
+      this.scene.stop(game.worldKey);
       this.scene.stop();
       this.scene.start('Title');
     }, 0x3a3f55, 30);
@@ -55,7 +62,7 @@ export class Menu extends Phaser.Scene {
       deleteSave();
       storage.removeAllOwnKeys(); // only keys starting with "element118."
       this.scene.stop('UI');
-      this.scene.stop('World');
+      this.scene.stop(game.worldKey);
       this.scene.stop();
       this.scene.start('Title');
     }, 0x7a2a2a, 26);

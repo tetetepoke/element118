@@ -17,6 +17,10 @@ export interface Substance {
   /** Bonds for the structure drawing: [atomIndexA, atomIndexB, order]. Atoms listed in `atoms`. */
   atoms: string[];
   bonds: [number, number, number][];
+  /** 'network' = covalent network solid (no separate molecules, e.g. SiC). Not made by the つなぐ hands rule. */
+  structure?: 'molecule' | 'network';
+  /** How this substance is obtained in play. 'character' = CHARACTER BOND (Carbon + a party member). */
+  obtainedBy?: 'bond_panel' | 'character';
   /** Bond angle in degrees for 3-atom molecules (centre = atoms[0]). */
   angle?: number;
   name: { ja: string; en: string };
@@ -144,6 +148,43 @@ export const SUBSTANCES: Substance[] = [
     implemented: false,
     reviewed: false,
   },
+  {
+    // Silicon carbide. A covalent NETWORK solid: no SiC molecules exist; every Si is bonded to 4 C and
+    // every C to 4 Si, all through the crystal. The つなぐ hands rule (tree molecules) therefore never
+    // makes it — it only appears through the CHARACTER BOND with Silica (game mechanic).
+    id: 'sic',
+    category: 'compound',
+    bondType: 'covalent',
+    structure: 'network',
+    obtainedBy: 'character',
+    formula: 'SiC',
+    composition: { Si: 1, C: 1 },
+    atoms: ['Si', 'C'],
+    bonds: [],
+    name: { ja: '炭化ケイ素', en: 'Silicon carbide' },
+    state: '固体（結晶）',
+    properties: ['とても硬い', '高い温度に強い'],
+    effects: ['form_sic'],
+    break: { allowed: true, realMethod: 'ふつうの方法では分けられない（とても安定している）' },
+    facts: [
+      'ケイ素（Si）と炭素（C）が1：1の割合で結びついた化合物。',
+      '小さな分子ではなく、Siのまわりに4つのC、Cのまわりに4つのSiが立体的につながり、結晶全体が網目のように一つにつながっている（共有結合の結晶）。',
+      'とても硬く、紙やすりや物をけずる道具（研磨剤）に使われる。',
+      '高い温度に強く、電気を効率よく使う半導体（パワー半導体）の材料にもなる。',
+      '自然の中ではとても珍しく、隕石などから見つかる（モアッサナイト）。',
+    ],
+    gameNotes: [
+      '「SiC FORM」は、カーボンとシリカが力を合わせたゲームの中の架空の姿です。',
+      'ゲームの能力 HARD BREAK（硬い岩をこわす）と HEAT RESIST（熱い地帯を進む）は、本物のSiCの「硬さ」と「熱への強さ」をモチーフにしています。',
+      '人がSiCになることはありません。SiCになっても熱い所を歩けるようになるわけではありません。',
+    ],
+    dangers: ['高温の場所や、熱い物・溶けた物には絶対に近づかないこと。'],
+    realProcess: '工場では、ケイ砂（二酸化ケイ素）と炭素を電気炉で約2000℃以上に熱してつくる：SiO₂ ＋ 3C → SiC ＋ 2CO。',
+    ceremony: 'big',
+    pubchemCid: 9863,
+    implemented: true,
+    reviewed: false,
+  },
 ];
 
 export interface ReactionTerm {
@@ -230,6 +271,7 @@ export function substanceByComposition(c: Record<string, number>): Substance | u
 export const KIND_LABEL: Record<string, string> = {
   element_bond: '元素同士の結合',
   covalent: '分子（共有結合）',
+  network: '共有結合の結晶（網目状）',
   ionic: '化合物（イオン結合）',
   mixture: '混合物・合金',
   reaction: '化学反応',
@@ -237,6 +279,6 @@ export const KIND_LABEL: Record<string, string> = {
 
 export function kindOf(s: Substance): string {
   if (s.category === 'element_bond') return 'element_bond';
-  if (s.category === 'compound') return s.bondType ?? 'covalent';
+  if (s.category === 'compound') return s.structure === 'network' ? 'network' : s.bondType ?? 'covalent';
   return 'mixture';
 }

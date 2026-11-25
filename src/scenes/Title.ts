@@ -66,7 +66,7 @@ export class Title extends Phaser.Scene {
         game.reset(newGame());
       }
       this.cameras.main.fadeOut(400, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('World', { fresh: !cont }));
+      this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start(game.worldKey, { fresh: !cont }));
     };
 
     const saved = hasSave();

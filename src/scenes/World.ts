@@ -125,7 +125,7 @@ export class World extends Phaser.Scene {
     cam.fadeIn(500);
 
     // restore party followers
-    for (const id of d.party) this.makeFollower(id);
+    for (const id of d.activeParty) this.makeFollower(id);
 
     this.scene.launch('UI');
     this.scene.bringToTop('UI');
@@ -337,6 +337,7 @@ export class World extends Phaser.Scene {
     this.updateFollowers();
     this.checkCrystals();
     this.checkTriggers();
+    if (!this.goalArmed && Math.hypot(this.player.x - (24 * 16 + 8), this.player.y - (4 * 16 + 8)) > 48) this.goalArmed = true;
     this.updateShots(time);
   }
 
@@ -838,11 +839,25 @@ export class World extends Phaser.Scene {
     this.autosave();
   }
 
+  private goalArmed = true;
   private async reachGoal() {
-    if (game.flag('stage1_clear') || this.busy || ui.locked) return;
+    if (this.busy || ui.locked) return;
+    if (game.flag('stage1_clear')) {
+      // already cleared (e.g. continuing an old save): stepping on the goal again offers stage 2
+      if (!this.goalArmed) return;
+      this.goalArmed = false;
+      this.player.lock(true);
+      this.busy = true;
+      this.scene.pause();
+      bus.emit(EV.UI_MODE, 'hidden');
+      this.scene.launch('StageClear');
+      this.scene.bringToTop('StageClear');
+      return;
+    }
     this.busy = true;
     this.player.lock(true);
     game.setFlag('stage1_clear');
+    this.goalArmed = false;
     await this.sayAsync('goal');
     this.autosave();
     this.scene.pause();

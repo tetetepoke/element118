@@ -22,7 +22,7 @@ export function queueOverrides(scene: Phaser.Scene, manifest: AssetManifest): Se
   for (const [key, o] of Object.entries(manifest)) {
     if (!o || typeof o.file !== 'string' || key.startsWith('_')) continue;
     const url = o.file.startsWith('data:') ? o.file : `assets/${o.file}`;
-    if (key === 'tiles' || o.type === 'image') scene.load.image(key, url);
+    if (key === 'tiles' || key === 'tiles2' || o.type === 'image') scene.load.image(key, url);
     else scene.load.spritesheet(key, url, { frameWidth: o.frameWidth ?? 32, frameHeight: o.frameHeight ?? 32 });
     if (o.directions) spriteDirections[key] = o.directions;
     loaded.add(key);

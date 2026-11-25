@@ -86,6 +86,24 @@ class GameState {
   }
   joinParty(id: string) {
     if (!this.hasParty(id)) this.data.party.push(id);
+    const a = this.data.activeParty;
+    if (!a.includes(id) && a.length < 2) a.push(id);
+  }
+  /** Travelling with Carbon now (max 2 of the recruited). */
+  isActive(id: string) {
+    return this.data.activeParty.includes(id);
+  }
+  setActiveParty(ids: string[]) {
+    this.data.activeParty = ids.filter((id) => this.hasParty(id)).slice(0, 2);
+  }
+  addMarker(m: { id: string; x: number; y: number; label: string }) {
+    if (this.data.markers.some((x) => x.id === m.id && x.stage === this.data.stage)) return false;
+    this.data.markers.push({ ...m, stage: this.data.stage });
+    return true;
+  }
+  /** Scene key of the current stage. */
+  get worldKey() {
+    return this.data.stage >= 2 ? 'Valley' : 'World';
   }
 
   save(): boolean {
@@ -109,8 +127,10 @@ export const input = {
   bond: false,
   menu: false,
   codex: false,
+  form: false, // BOND/BREAK the CHARACTER BOND form
+  swap: false, // switch control between Carbon and the split partner
   clearEdges() {
-    this.attack = this.dodge = this.element = this.bond = this.menu = this.codex = false;
+    this.attack = this.dodge = this.element = this.bond = this.menu = this.codex = this.form = this.swap = false;
   },
 };
 
@@ -119,4 +139,8 @@ export const ui = {
   locked: false,
   /** Label for the A button ("攻撃" or "調べる"). */
   aLabel: '攻撃',
+  /** Label of the FORM button ('' = hidden): 'C＋Si' (BOND) or 'BREAK'. */
+  formLabel: '',
+  /** Show the 交代 (switch control) button. */
+  swapVisible: false,
 };

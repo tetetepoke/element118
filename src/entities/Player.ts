@@ -30,8 +30,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   onSwing?: (x: number, y: number, r: number, step: number) => void;
   onDust?: (x: number, y: number) => void;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
-    super(scene, x, y, 'carbon', 0);
+  /** Sprite family: 'carbon' (with mask / forms) or a partner such as 'silica' when controlled after BREAK. */
+  readonly baseKey: string;
+  /** CHARACTER BOND form: 'normal' or 'sic'. */
+  form = 'normal';
+
+  constructor(scene: Phaser.Scene, x: number, y: number, baseKey = 'carbon') {
+    super(scene, x, y, baseKey === 'carbon' ? 'carbon' : scene.textures.exists(baseKey) ? baseKey : 'carbon', 0);
+    this.baseKey = baseKey;
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setOrigin(0.5, 0.85);
@@ -52,7 +58,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private play8(name: string) {
     this.lastAnim = name;
     let [row, flip] = spriteRowFor(this.facing, spriteDirections.carbon ?? 4);
-    const prefix = this.masked ? 'carbonm' : 'carbon';
+    const prefix = this.animPrefix();
     if (row === 'side' && flip && this.scene.anims.exists(`${prefix}_${name}_side_left`)) {
       row = 'side_left' as typeof row;
       flip = false;
@@ -62,10 +68,28 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const cur = this.anims.currentAnim?.key;
     if (cur === key) return;
     // swapping mask on/off mid-animation keeps the frame position
-    const sameAnim = cur && cur.replace(/^carbonm?_/, '') === key.replace(/^carbonm?_/, '');
+    const strip = (k: string) => k.replace(/^(carbonm?|sic|silica)_/, '');
+    const sameAnim = cur && strip(cur) === strip(key);
     const progress = sameAnim ? this.anims.getProgress() : 0;
     this.play(key, true);
     if (sameAnim && progress > 0) this.anims.setProgress(progress);
+  }
+
+  private animPrefix() {
+    if (this.baseKey !== 'carbon') return this.baseKey;
+    if (this.form === 'sic') return 'sic';
+    return this.masked ? 'carbonm' : 'carbon';
+  }
+
+  /** Play a named animation in the current facing (used when the partner is moved by the scene). */
+  anim(name: string) {
+    this.play8(name);
+  }
+
+  setForm(f: string) {
+    if (f === this.form) return;
+    this.form = f;
+    this.play8(this.lastAnim);
   }
 
   setMasked(v: boolean) {

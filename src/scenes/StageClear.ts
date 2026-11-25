@@ -3,6 +3,7 @@ import { GAME_W, GAME_H, KIND_COLORS } from '../config';
 import { game, bus } from '../core/state';
 import { txt, panel, button } from '../ui/widgets';
 import { sfx } from '../core/audio';
+import { enterStage2 } from '../core/stages';
 
 export class StageClear extends Phaser.Scene {
   constructor() {
@@ -12,7 +13,7 @@ export class StageClear extends Phaser.Scene {
   create() {
     sfx('bigchime');
     this.add.rectangle(0, 0, GAME_W, GAME_H, 0x05070f, 0.85).setOrigin(0).setInteractive();
-    panel(this, 160, 60, GAME_W - 320, GAME_H - 120, 0x10152a, 0.98, 0xffd84a);
+    panel(this, 160, 40, GAME_W - 320, GAME_H - 60, 0x10152a, 0.98, 0xffd84a);
     txt(this, GAME_W / 2, 110, '第一段階クリア！', 56, '#ffd84a', { fontStyle: 'bold' }).setOrigin(0.5);
     const d = game.data;
     const t = Math.floor(d.playTimeSec);
@@ -29,19 +30,20 @@ export class StageClear extends Phaser.Scene {
       txt(this, 260, 200 + i * 62, k, 28, '#8fa5c8');
       txt(this, 720, 200 + i * 62, v, 30, colors[i], { fontStyle: 'bold' });
     });
-    txt(this, GAME_W / 2, 600, '元素は組み合わさると性質が変わる。でも、合わさり方は1種類じゃない――\nこの先「滝の崖」で、新しい合わさり方が待っている（次のバージョン）', 24, '#cfe8ff', { align: 'center' }).setOrigin(0.5);
-    button(this, GAME_W / 2 - 200, 700, 340, 72, '冒険を続ける', () => {
+    txt(this, GAME_W / 2, 590, '元素は組み合わさると性質が変わる。でも、合わさり方は1種類じゃない――\n川の上流「珪晶の谷」で、新しい出会いが待っている。', 24, '#cfe8ff', { align: 'center' }).setOrigin(0.5);
+    button(this, GAME_W / 2, 680, 420, 72, 'ステージ2「珪晶の谷」へ', () => enterStage2(this, 'World'), 0x5a4ab8, 30);
+    button(this, GAME_W / 2 - 260, 760, 300, 56, '冒険を続ける', () => {
       this.scene.stop();
-      const w = this.scene.get('World') as unknown as { player: { lock: (v: boolean) => void }; busy: boolean };
+      const w = this.scene.get(game.worldKey) as unknown as { player: { lock: (v: boolean) => void }; busy: boolean };
       w.player.lock(false);
       (w as unknown as { busy: boolean }).busy = false;
       bus.emit('world-resume');
-    }, 0x1f6a8a, 30);
-    button(this, GAME_W / 2 + 200, 700, 340, 72, 'タイトルへ', () => {
+    }, 0x1f6a8a, 24);
+    button(this, GAME_W / 2 + 260, 760, 300, 56, 'タイトルへ', () => {
       this.scene.stop('UI');
-      this.scene.stop('World');
+      this.scene.stop(game.worldKey);
       this.scene.stop();
       this.scene.start('Title');
-    }, 0x3a3f55, 30);
+    }, 0x3a3f55, 24);
   }
 }

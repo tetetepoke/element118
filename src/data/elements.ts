@@ -42,6 +42,8 @@ export interface ElementInfo {
   facts: string[];
   properties: string[];
   character?: string;
+  /** false = cannot be carried as a "かけら" / used in the つなぐ panel (e.g. Si appears as a party member). */
+  carryable: boolean;
   reviewed: boolean;
 }
 
@@ -97,6 +99,19 @@ const DETAILS: Record<string, Partial<ElementInfo>> = {
       '物が燃えるのを助け、わたしたちは呼吸で酸素を取り入れている。',
     ],
   },
+  Si: {
+    implemented: true,
+    hands: 4,
+    character: 'silica',
+    carryable: false,
+    properties: ['結合の手は4本（炭素と同じ）', '岩や砂の中に多い'],
+    facts: [
+      '原子番号14。周期表で炭素のすぐ下にあり、炭素と同じく結合の手を4本もつ。',
+      '地球の表面近く（地殻）では、酸素の次に多い元素。',
+      '自然の中では単体ではほとんど見つからず、二酸化ケイ素（石英や砂の主成分）などとして存在する。',
+      'コンピューターのチップや太陽電池をつくる半導体の材料になる。',
+    ],
+  },
 };
 
 export const ELEMENTS: ElementInfo[] = RAW.split(';').map((entry, i) => {
@@ -114,6 +129,7 @@ export const ELEMENTS: ElementInfo[] = RAW.split(';').map((entry, i) => {
     facts: d.facts ?? [],
     properties: d.properties ?? [],
     character: d.character,
+    carryable: d.carryable ?? true,
     reviewed: false,
   };
 });

@@ -4,3 +4,5 @@ test-output/
 *.log
 .DS_Store
 dist-single/
+__pycache__/
+*.pyc

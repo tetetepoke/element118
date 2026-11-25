@@ -1,6 +1,6 @@
 import { storage } from './storage';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 const SLOT = 'save.slot1';
 const BACKUP = 'save.slot1.backup';
 
@@ -22,7 +22,16 @@ export interface SaveData {
     /** Kinds of "合わさり方" seen so far (element_bond, covalent, ionic, mixture, reaction). */
     bondKinds: string[];
   };
+  /** Everyone who has joined (recruited). */
   party: string[];
+  /** v2: who travels with Carbon right now (max 2). */
+  activeParty: string[];
+  /** v2: current stage (1 = カーボ村〜火の道, 2 = 珪晶の谷). */
+  stage: number;
+  /** v2: Carbon's current form ('normal' or a CHARACTER BOND form such as 'sic'). */
+  form: string;
+  /** v2: places that need an element we do not have yet ("？" on the map). */
+  markers: { stage: number; id: string; x: number; y: number; label: string; solved?: boolean }[];
   flags: Record<string, boolean | number>;
   stats: { bondAttempts: number; bondFailures: number; enemiesDefeated: number };
 }
@@ -39,6 +48,10 @@ export function newGame(): SaveData {
     equipped: null,
     discovered: { elements: [], substances: [], reactions: [], bondKinds: [] },
     party: [],
+    activeParty: [],
+    stage: 1,
+    form: 'normal',
+    markers: [],
     flags: {},
     stats: { bondAttempts: 0, bondFailures: 0, enemiesDefeated: 0 },
   };
@@ -52,6 +65,8 @@ function isSave(v: unknown): v is SaveData {
 /** Upgrade older save formats here (1 -> 2 -> ...). */
 function migrate(d: SaveData): SaveData {
   const base = newGame();
+  // v1 -> v2: everyone recruited so far travels along (at most 2 — stage 1 has exactly Hyde and Oxy).
+  if (!Array.isArray((d as Partial<SaveData>).activeParty)) d = { ...d, activeParty: (d.party ?? []).slice(0, 2) };
   // Fill any field added after this save was written.
   return {
     ...base,

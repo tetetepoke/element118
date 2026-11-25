@@ -30,6 +30,8 @@ export class UI extends Phaser.Scene {
   private btnA!: CircleBtn;
   private btnE!: CircleBtn;
   private btnBond!: CircleBtn;
+  private btnForm!: CircleBtn;
+  private btnSwap!: CircleBtn;
   private guardPointer: number | null = null;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private showTouch = true;
@@ -77,6 +79,14 @@ export class UI extends Phaser.Scene {
     this.btnBond = this.makeCircle(GAME_W - 186, 66, 50, KIND_COLORS.covalent, 'BOND', 24);
     this.btnBond.c.getByName('zone')?.on('pointerdown', () => { input.bond = true; this.press(this.btnBond); });
     this.hud.add(this.btnBond.c);
+    // Stage 2: CHARACTER BOND form toggle (BOND / BREAK) and control switch after BREAK
+    this.btnForm = this.makeCircle(GAME_W - 302, 66, 50, 0x8a7ad8, 'BREAK', 22);
+    this.btnForm.c.getByName('zone')?.on('pointerdown', () => { input.form = true; this.press(this.btnForm); });
+    this.btnSwap = this.makeCircle(GAME_W - 418, 66, 50, 0x3a7a6a, '交代', 24);
+    this.btnSwap.c.getByName('zone')?.on('pointerdown', () => { input.swap = true; this.press(this.btnSwap); });
+    this.hud.add([this.btnForm.c, this.btnSwap.c]);
+    this.btnForm.c.setVisible(false);
+    this.btnSwap.c.setVisible(false);
 
     // ── touch controls ──
     this.controls = this.add.container(0, 0);
@@ -113,7 +123,7 @@ export class UI extends Phaser.Scene {
 
     if (!this.showTouch) {
       this.hud.add(
-        txt(this, 30, GAME_H - 44, '移動 WASD/矢印　攻撃・調べる J/Space　回避 K/Shift　ガード L　元素 I　BOND U　図鑑 C　メニュー Esc', 18, '#ffffff', {
+        txt(this, 30, GAME_H - 44, '移動 WASD/矢印　攻撃・調べる J/Space　回避 K/Shift　ガード L　元素 I　BOND U　図鑑 C　メニュー Esc' + (game.data.stage >= 2 ? '　FORM F　交代 Q' : ''), 18, '#ffffff', {
           backgroundColor: 'rgba(0,0,0,0.45)',
           padding: { x: 10, y: 4 },
         }),
@@ -170,6 +180,8 @@ export class UI extends Phaser.Scene {
       if (k === 'KeyU' || k === 'KeyB') input.bond = true;
       if (k === 'KeyC') input.codex = true;
       if (k === 'Escape') input.menu = true;
+      if (k === 'KeyF') input.form = true;
+      if (k === 'KeyQ' || k === 'Tab') input.swap = true;
     });
     kb.on('keyup-L', () => (input.guard = false));
 
@@ -219,6 +231,13 @@ export class UI extends Phaser.Scene {
     }
     if (this.btnA.t.text !== ui.aLabel) this.btnA.t.setText(ui.aLabel);
     this.btnBond.c.setVisible(game.flag('got_codex'));
+    this.btnForm.c.setVisible(!!ui.formLabel);
+    if (ui.formLabel && this.btnForm.t.text !== ui.formLabel) {
+      this.btnForm.t.setText(ui.formLabel);
+      this.btnForm.color = ui.formLabel === 'BREAK' ? 0xd8584a : 0x8a7ad8;
+      this.drawCircle(this.btnForm);
+    }
+    this.btnSwap.c.setVisible(ui.swapVisible);
 
     // typewriter
     if (this.typing) {
@@ -311,7 +330,7 @@ export class UI extends Phaser.Scene {
     this.atomText.removeAll(true);
     let x = 0;
     for (const sym of game.data.discovered.elements) {
-      if (sym === 'C') continue;
+      if (sym === 'C' || !element(sym).carryable) continue;
       const n = game.atoms(sym);
       const g = this.add.graphics();
       g.fillStyle(0x000000, 0.4);
@@ -399,7 +418,7 @@ export class UI extends Phaser.Scene {
     this.joyId = null;
     this.controls.setVisible(false);
     this.dlg.setVisible(true);
-    const sys = line.who === 'sys';
+    const sys = line.who === 'sys' || !this.textures.exists(`pt_${line.who}`);
     this.dlgPortrait.setVisible(!sys);
     if (!sys) this.dlgPortrait.setTexture(`pt_${line.who}`).setDisplaySize(192, 192);
     this.dlgName.setText(SPEAKER_NAME[line.who]);

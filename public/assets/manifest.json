@@ -117,5 +117,55 @@
     "frameHeight": 32,
     "directions": 4,
     "source": "scripts/trace-carbon.py (traced from the design reference onto a 32x32 grid)"
+  },
+  "silica": {
+    "file": "sprites/silica.png",
+    "frameWidth": 32,
+    "frameHeight": 32,
+    "directions": 4,
+    "source": "scripts/trace-stage2.py (traced from the stage 2 design reference onto the grid)"
+  },
+  "sic": {
+    "file": "sprites/sic.png",
+    "frameWidth": 32,
+    "frameHeight": 32,
+    "directions": 4,
+    "source": "scripts/trace-stage2.py (traced from the stage 2 design reference onto the grid)"
+  },
+  "pt_silica": {
+    "file": "sprites/pt_silica.png",
+    "frameWidth": 192,
+    "frameHeight": 192,
+    "source": "scripts/trace-stage2.py (traced from the stage 2 design reference onto the grid)"
+  },
+  "cslime": {
+    "file": "sprites/cslime.png",
+    "frameWidth": 32,
+    "frameHeight": 32,
+    "source": "scripts/trace-stage2.py (traced from the stage 2 design reference onto the grid)"
+  },
+  "golem": {
+    "file": "sprites/golem.png",
+    "frameWidth": 32,
+    "frameHeight": 32,
+    "source": "scripts/trace-stage2.py (traced from the stage 2 design reference onto the grid)"
+  },
+  "beetle": {
+    "file": "sprites/beetle.png",
+    "frameWidth": 32,
+    "frameHeight": 32,
+    "source": "scripts/trace-stage2.py (traced from the stage 2 design reference onto the grid)"
+  },
+  "drill": {
+    "file": "sprites/drill.png",
+    "frameWidth": 32,
+    "frameHeight": 32,
+    "source": "scripts/trace-stage2.py (traced from the stage 2 design reference onto the grid)"
+  },
+  "boss_cb": {
+    "file": "sprites/boss_cb.png",
+    "frameWidth": 96,
+    "frameHeight": 96,
+    "source": "scripts/trace-stage2.py (traced from the stage 2 design reference onto the grid)"
   }
 }

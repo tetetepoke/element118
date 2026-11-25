@@ -9,6 +9,11 @@ import { Ceremony } from './scenes/Ceremony';
 import { Codex } from './scenes/Codex';
 import { Menu } from './scenes/Menu';
 import { StageClear } from './scenes/StageClear';
+import { Valley } from './scenes/Valley';
+import { FormBond } from './scenes/FormBond';
+import { PartySelect } from './scenes/PartySelect';
+import { MapView } from './scenes/MapView';
+import { Periodic } from './scenes/Periodic';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -21,7 +26,7 @@ const game = new Phaser.Game({
   physics: { default: 'arcade', arcade: { debug: false } },
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   input: { activePointers: 4 },
-  scene: [Boot, Title, World, UI, BondPanel, Ceremony, Codex, Menu, StageClear],
+  scene: [Boot, Title, World, Valley, UI, BondPanel, Ceremony, Codex, Menu, StageClear, FormBond, PartySelect, MapView, Periodic],
 });
 
 // for automated tests

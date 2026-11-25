@@ -17,8 +17,15 @@ export class Breakling extends Phaser.Physics.Arcade.Sprite {
   /** Telegraph: the enemy flashes before it lunges, so phone players can react. */
   telegraphUntil = 0;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, id: string) {
-    super(scene, x, y, 'breakling', 0);
+  /** Texture / animation family ('breakling', 'cslime', 'golem', 'beetle', 'drill'). */
+  kind: string;
+  /** Armoured enemies only take damage from HARD BREAK (SiC FORM). */
+  armored = false;
+  speedMul = 1;
+
+  constructor(scene: Phaser.Scene, x: number, y: number, id: string, kind = 'breakling') {
+    super(scene, x, y, scene.textures.exists(kind) ? kind : 'breakling', 0);
+    this.kind = scene.textures.exists(kind) ? kind : 'breakling';
     this.id = id;
     this.homeX = x;
     this.homeY = y;
@@ -29,7 +36,7 @@ export class Breakling extends Phaser.Physics.Arcade.Sprite {
     body.setSize(14, 9);
     body.setOffset(9, 19);
     body.setCollideWorldBounds(true);
-    this.play('breakling_move');
+    this.play(`${this.kind}_move`);
   }
 
   update(now: number, px: number, py: number) {
@@ -45,7 +52,7 @@ export class Breakling extends Phaser.Physics.Arcade.Sprite {
       body.velocity.scale(0.85);
       return;
     }
-    if (this.anims.currentAnim?.key !== 'breakling_move' || !this.anims.isPlaying) this.play('breakling_move');
+    if (this.anims.currentAnim?.key !== 'breakling_move' || !this.anims.isPlaying) this.play(`${this.kind}_move`);
     const dx = px - this.x, dy = py - this.y;
     const dist = Math.hypot(dx, dy);
     const homeDist = Math.hypot(this.x - this.homeX, this.y - this.homeY);
@@ -60,7 +67,7 @@ export class Breakling extends Phaser.Physics.Arcade.Sprite {
       this.telegraphUntil = 0;
       this.clearTint();
       const len = dist || 1;
-      this.setVelocity((dx / len) * 150, (dy / len) * 150);
+      this.setVelocity((dx / len) * 150 * this.speedMul, (dy / len) * 150 * this.speedMul);
       this.lungeUntil = now + 300;
       this.lungeCooldown = now + 1400;
       return;
@@ -72,7 +79,7 @@ export class Breakling extends Phaser.Physics.Arcade.Sprite {
         return;
       }
       const len = dist || 1;
-      this.setVelocity((dx / len) * 42, (dy / len) * 42);
+      this.setVelocity((dx / len) * 42 * this.speedMul, (dy / len) * 42 * this.speedMul);
       this.setFlipX(dx < 0);
     } else {
       if (now > this.wanderUntil) {

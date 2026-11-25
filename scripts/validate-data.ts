@@ -47,7 +47,7 @@ for (const s of SUBSTANCES) {
   });
   s.atoms.forEach((a, i) => {
     const h = element(a).hands;
-    if (s.bondType === 'covalent' && h !== null && used[i] !== h) err(`${s.id}: atom ${a}#${i} uses ${used[i]} hands, expected ${h}`);
+    if (s.bondType === 'covalent' && s.structure !== 'network' && h !== null && used[i] !== h) err(`${s.id}: atom ${a}#${i} uses ${used[i]} hands, expected ${h}`);
   });
   if (s.implemented) {
     for (const sym of Object.keys(s.composition)) if (!element(sym).implemented) err(`${s.id}: implemented but uses unimplemented ${sym}`);
@@ -55,7 +55,14 @@ for (const s of SUBSTANCES) {
 }
 
 // 3. Every combination the hands rule accepts must be a registered, real substance.
-const covalentElems = ELEMENTS.filter((e) => e.implemented && e.hands !== null).map((e) => e.symbol);
+const covalentElems = ELEMENTS.filter((e) => e.implemented && e.hands !== null && e.carryable).map((e) => e.symbol);
+// network solids must never be produced by the tree-molecule hands rule
+for (const s of SUBSTANCES) {
+  if (s.structure !== 'network') continue;
+  if (s.bonds.length) err(`${s.id}: a network solid has no single-molecule bond list`);
+  const combo = Object.entries(s.composition).flatMap(([k, n]) => Array(n).fill(k));
+  if (tryCovalent(combo, (x) => element(x).hands).ok) err(`${s.id}: network solid is accepted by the hands rule`);
+}
 function multisets(size: number, from: number, acc: string[], out: string[][]) {
   if (acc.length === size) return void out.push(acc.slice());
   for (let i = from; i < covalentElems.length; i++) {
@@ -118,18 +125,22 @@ for (const file of walk('src')) {
 
 // 6. Character design reference (docs/CHARACTER_DESIGN.md): kept byte-for-byte and never shipped.
 //    Only the tracing scripts (scripts/trace-*.py) may open it, read-only, as an underdrawing.
-const REF = 'art/reference/character-design-reference.png';
-const REF_SHA256 = '2b09ca700caeadd5911caccf699a352c03318cd6a7a504a56fe78011aec2eeba';
-if (!existsSync(REF)) err(`${REF} is missing`);
-else if (createHash('sha256').update(readFileSync(REF)).digest('hex') !== REF_SHA256)
-  err(`${REF} has been changed (re-encoded, resized or overwritten). Restore the original PNG.`);
+const REFS: [string, string][] = [
+  ['art/reference/character-design-reference.png', '2b09ca700caeadd5911caccf699a352c03318cd6a7a504a56fe78011aec2eeba'],
+  ['art/reference/stage2-design-reference.png', '403069cacd2c7b74b32be13780d9f4efd4666b05af1a759a1c014e5f429647df'],
+];
+for (const [ref, sha] of REFS) {
+  if (!existsSync(ref)) err(`${ref} is missing`);
+  else if (createHash('sha256').update(readFileSync(ref)).digest('hex') !== sha)
+    err(`${ref} has been changed (re-encoded, resized or overwritten). Restore the original PNG.`);
+}
 for (const file of [...walk('src'), ...walk('scripts'), ...walk('public'), 'index.html', 'vite.config.ts']) {
   if (!/\.(ts|js|mjs|py|html|json)$/.test(file) || file.endsWith('validate-data.ts')) continue;
   if (/scripts[\\/]trace-[\w-]+\.py$/.test(file)) continue;
-  if (/character-design-reference/.test(readFileSync(file, 'utf8'))) err(`${file}: the design reference may only be read by scripts/trace-*.py`);
+  if (/(character|stage2)-design-reference/.test(readFileSync(file, 'utf8'))) err(`${file}: the design reference may only be read by scripts/trace-*.py`);
 }
 for (const file of walk('public')) {
-  if (/\.png$/.test(file) && createHash('sha256').update(readFileSync(file)).digest('hex') === REF_SHA256)
+  if (/\.png$/.test(file) && REFS.some(([, sha]) => createHash('sha256').update(readFileSync(file)).digest('hex') === sha))
     err(`${file}: copy of the design reference inside public/`);
 }
 
