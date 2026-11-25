@@ -133,7 +133,7 @@ export const FORMS: Record<string, BondForm> = {
 export const OBSTACLE_SOLUTIONS: Record<string, ObstacleSolution[]> = {
   hard_rock_gorge: [
     { kind: 'ability', ability: 'hard_break', note: 'SiC FORM の HARD BREAK で砕く', available: true },
-    { kind: 'climb', note: '崖を登って上から回りこむ（崖登りとスタミナは今後）', available: false },
+    { kind: 'climb', note: '東の崖ぞいの岩棚を1段ずつよじ登る（遠回りの別ルート）', available: true },
     { kind: 'device', note: '別の元素で古代装置を動かす（今後）', available: false },
   ],
 };

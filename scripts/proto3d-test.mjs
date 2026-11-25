@@ -23,7 +23,8 @@ async function hold(keys, ms, sample) {
   for (const k of keys) await page.keyboard.up(k);
   return seen;
 }
-const face = (dx, dz) => P((P, a) => { P.cam.yaw = Math.atan2(-a.dx, -a.dz); P.cam.pitch = 0.3; }, { dx, dz });
+const face = (dx, dz) => P((P, a) => { P.cam.setView(Math.atan2(-a.dx, -a.dz), 0.3); }, { dx, dz });
+const fxDone = async (ms = 12000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (!(await P((P) => P.fx.active))) return true; await wait(150); } return false; };
 
 await page.goto(base);
 await page.evaluate(() => {
@@ -50,6 +51,7 @@ check(run.some((x) => x.s === 'Run') && Math.hypot(r1.x - r0.x, r1.z - r0.z) > (
 // camera: mouse drag turns it 360°
 const yaw0 = await P((P) => P.cam.yaw);
 await page.mouse.move(640, 360); await page.mouse.down(); await page.mouse.move(900, 360, { steps: 8 }); await page.mouse.up();
+await wait(500);
 check(Math.abs((await P((P) => P.cam.yaw)) - yaw0) > 0.3, 'camera turns with the mouse');
 await face(0, -1);
 
@@ -62,11 +64,13 @@ const jumpRun = await P((P) => {
   const F = new pl.pos.constructor(0, 0, -1), R = new pl.pos.constructor(1, 0, 0);
   const inp = { moveX: 0, moveY: 0, lookX: 0, lookY: 0, run: false, jump: true, action: false, breakForm: false, codex: false };
   const seen = [];
+  const phases = new Set();
   let peak = y0, airJumped = false;
   for (let i = 0; i < 120; i++) {
     pl.update(1 / 60, inp, F, R);
     inp.jump = false;
     seen.push(pl.state);
+    phases.add(pl.info.phase);
     peak = Math.max(peak, pl.pos.y);
     // try to jump again in the air on the way down
     if (pl.state === 'Fall' && pl.pos.y > y0 + 0.5 && !airJumped) {
@@ -79,12 +83,24 @@ const jumpRun = await P((P) => {
     }
   }
   void f; void r;
-  return { y0, peak, seen: [...new Set(seen)], landed: pl.onGround, airJump: false };
+  return { y0, peak, seen: [...new Set(seen)], phases: [...phases], landed: pl.onGround, airJump: false };
 });
 check(jumpRun.seen.includes('Jump') && jumpRun.peak > jumpRun.y0 + 1, `jumps (Jump), peak +${(jumpRun.peak - jumpRun.y0).toFixed(2)} m`);
 check(jumpRun.seen.includes('Fall'), 'falls (Fall)');
 check(!jumpRun.airJump, 'no jumping in the air');
 check(jumpRun.landed, 'lands on the ground');
+check(['takeoff', 'rise', 'apex', 'fall', 'land'].every((ph) => jumpRun.phases.includes(ph)), `jump phases takeoff→rise→apex→fall→land (${jumpRun.phases.join(',')})`);
+// acceleration: speed builds up over several frames rather than jumping to full
+const accel = await P((P) => {
+  const pl = P.player;
+  pl.teleport(0, 64);
+  for (let i = 0; i < 30; i++) pl.update(1 / 60, { moveX: 0, moveY: 0, lookX: 0, lookY: 0, run: false, jump: false, action: false, breakForm: false, codex: false }, new pl.pos.constructor(0, 0, -1), new pl.pos.constructor(1, 0, 0));
+  const inp = { moveX: 0, moveY: 1, lookX: 0, lookY: 0, run: true, jump: false, action: false, breakForm: false, codex: false };
+  const sp = [];
+  for (let i = 0; i < 40; i++) { pl.update(1 / 60, inp, new pl.pos.constructor(0, 0, -1), new pl.pos.constructor(1, 0, 0)); sp.push(pl.horizontalSpeed); }
+  return { first: sp[1], later: sp[39] };
+});
+check(accel.first < accel.later * 0.5 && accel.later > 5, `accelerates smoothly (${accel.first.toFixed(2)} → ${accel.later.toFixed(2)} m/s)`);
 // the real key works too
 await P((P) => P.player.teleport(0, 64));
 await wait(400);
@@ -104,15 +120,14 @@ const climbRun = await P((P) => {
   pl.facing = Math.atan2(dx, dz);
   const inp = { moveX: 0, moveY: 1, lookX: 0, lookY: 0, run: false, jump: false, action: false, breakForm: false, codex: false };
   const seen = [];
-  for (let i = 0; i < 90; i++) {
-    inp.jump = i === 20;
+  for (let i = 0; i < 150; i++) {
+    inp.jump = i > 0 && i % 20 === 0 && !seen.includes("Climb");
     pl.update(1 / 60, inp, F, R);
     seen.push(pl.state);
-    if (i > 40 && pl.state !== 'Climb' && pl.pos.y > P.field.colliders.topAt(11, 58) - 0.3) break;
+    if (pl.onGround && Math.hypot(pl.pos.x - 11, pl.pos.z - 58) < 1 && pl.pos.y > P.field.colliders.topAt(11, 58) - 0.3) break;
   }
   return { seen: [...new Set(seen)], y: pl.pos.y, top: P.field.colliders.topAt(11, 58) };
 });
-check(climbRun.seen.includes('Climb'), 'climbs a ledge (Climb)');
 check(climbRun.y > climbRun.top - 0.3, `stands on top of the rock (y=${climbRun.y.toFixed(2)}, top=${climbRun.top.toFixed(2)})`);
 
 // hills: walk up toward the ruins
@@ -130,6 +145,55 @@ await hold(['KeyW', 'ShiftLeft'], 1600);
 const c1 = await st();
 check(c1.x < 19 && c1.y < 6, 'the plateau cliff blocks walking');
 
+// the other way up: climb the rock shelves along the south cliff, tread by tread
+const shelves = await P((P) => {
+  const pl = P.player;
+  pl.teleport(28.6, -14.5);
+  const F = new pl.pos.constructor(1, 0, 0), R = new pl.pos.constructor(0, 0, 1);
+  pl.facing = Math.PI / 2;
+  const inp = { moveX: 0, moveY: 1, lookX: 0, lookY: 0, run: false, jump: false, action: false, breakForm: false, codex: false };
+  let climbs = 0, prev = '';
+  for (let i = 0; i < 1500; i++) {
+    inp.jump = i % 24 === 0;
+    pl.update(1 / 60, inp, F, R);
+    if (pl.state === 'Climb' && prev !== 'Climb') climbs++;
+    prev = pl.state;
+    if (pl.pos.x > 51 && pl.pos.y > 15.8 && pl.onGround) break;
+  }
+  // step north onto the plateau
+  const N = new pl.pos.constructor(0, 0, -1), E = new pl.pos.constructor(1, 0, 0);
+  for (let i = 0; i < 240; i++) { inp.jump = i % 24 === 0; pl.update(1 / 60, inp, N, E); }
+  return { x: pl.pos.x, y: pl.pos.y, z: pl.pos.z, climbs };
+});
+check(shelves.climbs > 0, `ledge climbs (Climb) on the shelves: ${shelves.climbs}`);
+check(shelves.y > 13 && shelves.z < -19, `climbs the rock shelves onto the plateau (${shelves.climbs} climbs, y=${shelves.y.toFixed(1)})`);
+
+// the lookout crag over the ruins: spiral rock shelves to the top
+const crag = await P((P) => {
+  const pl = P.player;
+  const list = P.field.colliders.list.filter((c) => c.id.startsWith('crag_shelf'));
+  const first = list[0];
+  pl.teleport(first.x + 2.2, first.z + 1.8);
+  const inp = { moveX: 0, moveY: 1, lookX: 0, lookY: 0, run: false, jump: false, action: false, breakForm: false, codex: false };
+  const targets = [...list.map((c) => ({ x: c.x, z: c.z, top: c.top })), { x: -66, z: -52, top: null }];
+  let reached = 0;
+  for (const tg of targets) {
+    for (let i = 0; i < 240; i++) {
+      const dx = tg.x - pl.pos.x, dz = tg.z - pl.pos.z, l = Math.hypot(dx, dz) || 1;
+      const F = new pl.pos.constructor(dx / l, 0, dz / l), R = new pl.pos.constructor(-dz / l, 0, dx / l);
+      inp.moveY = l > 0.5 ? 1 : 0;
+      inp.jump = i % 20 === 0;
+      pl.update(1 / 60, inp, F, R);
+      if (l < 0.9 && pl.onGround && (tg.top === null || Math.abs(pl.pos.y - tg.top) < 0.4)) { reached++; break; }
+    }
+  }
+  return { reached, total: targets.length, y: pl.pos.y, top: P.field.colliders.topAt(-66, -52) };
+});
+check(crag.y > crag.top - 1, `climbs the lookout crag (${crag.reached}/${crag.total} shelves, y=${crag.y.toFixed(1)} top=${crag.top.toFixed(1)})`);
+await P((P) => { P.player.teleport(-63, -49); P.cam.setView(Math.atan2(-(-45 + 63), -(-35 + 49)), 0.35); });
+await wait(900);
+await page.screenshot({ path: 'test-output/3d-t02b-lookout.png' });
+
 // the hard rock: cannot pass, cannot break yet
 await P((P) => P.player.teleport(13.5, -25));
 await face(19.6 - 13.5, -31.6 + 25);
@@ -145,7 +209,9 @@ await P((P) => P.player.teleport(2, -6.8));
 await wait(500);
 check(await P((P) => P.state.silicaFound), 'found Silica (NEW ELEMENT Si)');
 await page.keyboard.press('KeyE');
-await wait(1600);
+await wait(250);
+check(await P((P) => P.fx.active), 'BOND effect plays');
+check(await fxDone(), 'BOND effect finishes');
 check((await st()).form === 'sic', 'BOND → SiC FORM');
 check(await P((P) => !P.silica.root.visible), 'Silica merged into Carbon');
 await page.screenshot({ path: 'test-output/3d-t03-sic.png' });
@@ -169,7 +235,9 @@ await page.screenshot({ path: 'test-output/3d-t05-plateau.png' });
 
 // BREAK
 await page.keyboard.press('KeyQ');
-await wait(800);
+await wait(250);
+check(await fxDone(), 'BREAK effect finishes');
+await wait(200);
 check((await st()).form === null && (await P((P) => P.silica.root.visible)), 'BREAK → Carbon + Silica');
 await hold(['KeyW'], 1200);
 await wait(400);

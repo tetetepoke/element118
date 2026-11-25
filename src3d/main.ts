@@ -9,6 +9,7 @@ import { input, initKeyboardMouse, initTouch, pollInput, endFrame, bindButton } 
 import { load3d, save3d } from './core/storage';
 import { PlayerController } from './player/controller';
 import { ProceduralCarbon, ProceduralSilica } from './player/visual';
+import { BondFx } from './fx/bondFx';
 import { ABILITIES, ELEMENTS, FORMS, OBSTACLE_SOLUTIONS, PROPERTIES, recipeFor, type BondForm } from './chem/bondData';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -39,13 +40,15 @@ renderer.domElement.addEventListener('webglcontextlost', (e) => {
 const scene = new THREE.Scene();
 const SKY = new THREE.Color(0x9ccff0);
 scene.background = SKY;
-scene.fog = new THREE.Fog(0xb8dcf2, 70, 430);
+// aerial perspective: the fog colour is the horizon colour, so far hills fade into the sky
+const HORIZON = 0xc6dff0;
+scene.fog = new THREE.Fog(HORIZON, 45, 540);
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 900);
 
 // sky dome with a gradient
 {
   const g = new THREE.SphereGeometry(800, 24, 12);
-  const top = new THREE.Color(0x4f9ae0), mid = new THREE.Color(0xa8d8f4), low = new THREE.Color(0xe8f2f8);
+  const top = new THREE.Color(0x3f8ddc), mid = new THREE.Color(0x9fcff0), low = new THREE.Color(HORIZON);
   const pos = g.attributes.position as THREE.BufferAttribute;
   const cols = new Float32Array(pos.count * 3);
   const c = new THREE.Color();
@@ -60,18 +63,20 @@ const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerH
 }
 
 // light
-scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x5a7a3a, 0.9));
-const sun = new THREE.DirectionalLight(0xfff2dc, 2.2);
+// soft sky fill from above, warm bounce from the grass below, and one sun that gives rocks a lit side and a shade side
+scene.add(new THREE.HemisphereLight(0xd6ebff, 0x6b7a48, 0.85));
+const sun = new THREE.DirectionalLight(0xfff0d6, 2.5);
 sun.castShadow = true;
 sun.shadow.mapSize.set(isTouch ? 1024 : 2048, isTouch ? 1024 : 2048);
 const sc = sun.shadow.camera;
-sc.left = sc.bottom = -34;
-sc.right = sc.top = 34;
+sc.left = sc.bottom = -30;
+sc.right = sc.top = 30;
 sc.near = 1;
 sc.far = 160;
-sun.shadow.bias = -0.0006;
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.04;
 scene.add(sun, sun.target);
-const SUN_DIR = new THREE.Vector3(-0.45, 0.8, 0.35).normalize();
+const SUN_DIR = new THREE.Vector3(-0.5, 0.72, 0.45).normalize();
 
 // ── world ──
 const field = buildField();
@@ -86,6 +91,42 @@ scene.add(silica.root);
 const silicaPos = new THREE.Vector3(PLACES.silica.x, heightAt(PLACES.silica.x, PLACES.silica.y), PLACES.silica.y);
 silica.root.position.copy(silicaPos);
 let silicaMode: 'waiting' | 'merged' | 'following' = 'waiting';
+
+// contact shadows: a soft dark blob right under the feet, so you can always read where you'll land
+const blobTex = (() => {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 64;
+  const g = cv.getContext('2d')!;
+  const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(0,0,0,0.55)');
+  grd.addColorStop(0.55, 'rgba(0,0,0,0.3)');
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(cv);
+})();
+function makeBlob() {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.3).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false }));
+  m.renderOrder = 1;
+  scene.add(m);
+  return m;
+}
+const carbonBlob = makeBlob(), silicaBlob = makeBlob();
+function placeBlob(b: THREE.Mesh, at: THREE.Vector3, visible: boolean) {
+  b.visible = visible;
+  if (!visible) return;
+  const g = field.colliders.topAt(at.x, at.z, 0);
+  const ground = g <= at.y + 0.3 ? g : heightAt(at.x, at.z);
+  const hgt = Math.max(0, at.y - ground);
+  b.position.set(at.x, ground + 0.04, at.z);
+  const k = 1 / (1 + hgt * 0.35);
+  b.scale.setScalar(0.6 + 0.4 * k);
+  (b.material as THREE.MeshBasicMaterial).opacity = k;
+}
+
+const fx = new BondFx();
+scene.add(fx.root);
+const tmpV = new THREE.Vector3();
 
 const cam = new ThirdPersonCamera(camera, field.colliders);
 initKeyboardMouse(renderer.domElement);
@@ -199,42 +240,68 @@ function nearestBreakable(maxDist: number) {
 
 function doBond() {
   const recipe = recipeFor('Si');
-  if (!recipe) return;
+  if (!recipe || fx.active) return;
   const form = FORMS[recipe.form];
-  busy = 1.3;
+  const first = !state.sicFound;
+  busy = 99; // released when the effect ends
   player.locked = true;
   carbonVisual.playAction('bond');
   silica.playAction('bond');
-  banner(`C ＋ ${recipe.inputs[0]}`, 'BOND！', 1.2);
-  setTimeout(() => {
-    burst(player.pos.clone().add(new THREE.Vector3(0, 1, 0)), 26, false, sparkMat);
-    silica.root.visible = false;
-    silicaMode = 'merged';
-    state.form = form.id;
-    carbonVisual.setForm(form.visual);
-    const first = !state.sicFound;
-    state.sicFound = true;
-    persist();
-    banner(form.name, `${recipe.substance.formula}　${recipe.substance.nameJa} ── ${first ? 'NEW FORM DISCOVERED' : 'BOND'}`, 3);
-    if (first) setTimeout(() => showMsg(`<b>${form.name}</b>：${form.abilities.map((a) => ABILITIES[a].name).join('・')} が使える。<br>硬い岩の前で E（アクション）。もどるときは Q（BREAK）。<br><span style="color:#9fe0b8">※ 本物のSiCの「硬さ」をモチーフにしたゲームの能力。図鑑で本物の科学と見くらべられる。</span>`, 7), 1600);
-  }, 650);
+  banner(`C ＋ ${recipe.inputs[0]}`, 'BOND！', 1.5);
+  shake = 0.18;
+  fx.playBond({
+    from: () => silica.root.position,
+    to: () => carbonVisual.anchor(tmpV),
+    setProgress: (p) => carbonVisual.setFormProgress(form.visual, p),
+    silica: silica.root,
+    onCommit: () => {
+      // the one point where the save changes
+      silicaMode = 'merged';
+      state.form = form.id;
+      state.sicFound = true;
+      persist();
+    },
+    onDone: () => {
+      silica.root.visible = false;
+      carbonVisual.setForm(form.visual);
+      busy = 0;
+      player.locked = false;
+      banner(form.name, `${recipe.substance.formula}　${recipe.substance.nameJa} ── ${first ? 'NEW FORM DISCOVERED' : 'BOND'}`, 3);
+      if (first) setTimeout(() => showMsg(`<b>${form.name}</b>：${form.abilities.map((a) => ABILITIES[a].name).join('・')} が使える。<br>硬い岩の前で E（アクション）。もどるときは Q（BREAK）。<br><span style="color:#9fe0b8">※ 本物のSiCの「硬さ」をモチーフにしたゲームの能力。図鑑で本物の科学と見くらべられる。</span>`, 7), 900);
+    },
+  });
 }
 
 function doBreak() {
-  if (!state.form) return;
-  busy = 0.6;
+  if (!state.form || fx.active) return;
+  const form = currentForm();
+  busy = 99;
   player.locked = true;
-  burst(player.pos.clone().add(new THREE.Vector3(0, 1, 0)), 18, false, sparkMat);
-  carbonVisual.setForm('normal');
   const side = new THREE.Vector3(Math.cos(player.facing), 0, -Math.sin(player.facing)).multiplyScalar(1.4);
   silicaPos.copy(player.pos).add(side);
   silicaPos.y = field.colliders.topAt(silicaPos.x, silicaPos.z);
   silica.root.position.copy(silicaPos);
-  silica.root.visible = true;
-  silicaMode = 'following';
-  state.form = null;
-  persist();
+  silica.root.rotation.y = Math.atan2(player.pos.x - silicaPos.x, player.pos.z - silicaPos.z); // turns to face Carbon
+  silica.root.visible = false;
   banner('BREAK！', 'SiC FORM → C ＋ Si', 2);
+  const target = new THREE.Vector3();
+  fx.playBreak({
+    from: () => carbonVisual.anchor(tmpV).setY(player.pos.y + 0.2),
+    to: () => target.copy(silica.root.position).setY(silica.root.position.y + 0.8),
+    setProgress: (p) => carbonVisual.setFormProgress(form?.visual ?? 'sic', p),
+    silica: silica.root,
+    onCommit: () => {
+      silicaMode = 'following';
+      state.form = null;
+      persist();
+    },
+    onDone: () => {
+      carbonVisual.setForm('normal');
+      silica.root.visible = true;
+      busy = 0;
+      player.locked = false;
+    },
+  });
 }
 
 function doHardBreak() {
@@ -271,6 +338,15 @@ let last = performance.now();
 let t = 0;
 let fpsAcc = 0, fpsN = 0, fps = 60;
 const debugOn = new URLSearchParams(location.search).has('debug');
+/** test hooks: pause the loop and step the BOND/BREAK effect by hand to grab frames */
+const dbg = { paused: false };
+function stepFx(dt: number) {
+  fx.update(dt);
+  carbonVisual.update(dt);
+  silica.update(dt);
+  cam.update(dt, player.pos, false, player.facing);
+  renderer.render(scene, camera);
+}
 
 function frame(now: number) {
   // real time, capped; the simulation catches up in small steps so slow frames don't slow the game down
@@ -278,6 +354,7 @@ function frame(now: number) {
   last = now;
   t += dt;
   pollInput();
+  if (dbg.paused) { endFrame(); renderer.render(scene, camera); requestAnimationFrame(frame); return; }
   const codexOpen = $('codex').style.display === 'flex';
   if (input.codex) toggleCodex();
   if (codexOpen) { endFrame(); renderer.render(scene, camera); requestAnimationFrame(frame); return; }
@@ -306,17 +383,21 @@ function frame(now: number) {
   if (input.action && act && busy <= 0) act.run();
   if (input.breakForm && form && busy <= 0) doBreak();
 
-  // player (sub-stepped)
+  // player (sub-stepped); paused during the BOND/BREAK hit-stop
+  fx.update(dt);
+  const frozen = fx.frozen;
   const { forward, right } = cam.basis();
   const steps = Math.max(1, Math.ceil(dt / (1 / 30)));
-  for (let i = 0; i < steps; i++) {
-    player.update(dt / steps, input, forward, right);
-    if (i === 0) input.jump = false; // a jump press is used once
-  }
-  carbonVisual.update(dt);
+  if (!frozen) {
+    for (let i = 0; i < steps; i++) {
+      player.update(dt / steps, input, forward, right);
+      if (i === 0) input.jump = false; // a jump press is used once
+    }
+    carbonVisual.update(dt);
+  } else input.jump = false;
 
   // silica: wait, then follow Carbon after the first BREAK
-  if (silicaMode !== 'merged') {
+  if (silicaMode !== 'merged' && !fx.active) {
     const sp = silica.root.position;
     if (silicaMode === 'waiting') {
       const d = sp.distanceTo(player.pos);
@@ -370,7 +451,9 @@ function frame(now: number) {
   field.update(dt, t);
 
   // camera + sun follow
-  cam.update(dt, player.pos);
+  cam.update(dt, player.pos, player.moving, player.facing);
+  placeBlob(carbonBlob, player.pos, true);
+  placeBlob(silicaBlob, silica.root.position, silica.root.visible);
   if (shake > 0) {
     shake -= dt;
     camera.position.x += (Math.random() - 0.5) * shake * 0.6;
@@ -404,7 +487,7 @@ for (const ev of ['gesturestart', 'gesturechange', 'dblclick']) document.addEven
 document.addEventListener('visibilitychange', () => { if (document.hidden) persist(); });
 
 // for automated tests
-(window as unknown as Record<string, unknown>).__proto3d = { player, state, field, cam, silica, input, doBond, doBreak, doHardBreak };
+(window as unknown as Record<string, unknown>).__proto3d = { player, state, field, cam, silica, input, fx, carbon: carbonVisual, dbg, stepFx, doBond, doBreak, doHardBreak };
 
 player.visual.root.position.copy(player.pos);
 showMsg(isTouch ? '左側で移動、右側をスワイプでカメラ。遠くの光る尖塔をめざそう。' : 'WASDで移動、マウスでカメラ（クリックで固定）。遠くの光る尖塔をめざそう。', 6);
