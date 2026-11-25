@@ -54,6 +54,19 @@ export class Boot extends Phaser.Scene {
       }
     });
     for (const k of ['hyde', 'oxy', 'elder', 'villager']) {
+      // 4 frames = one row (down only); 12 frames = rows down / up / side
+      const total = this.textures.get(k).frameTotal - 1;
+      const dirRows = total >= 12 ? ['down', 'up', 'side'] : ['down'];
+      dirRows.forEach((row, ri) => {
+        a.create({ key: `${k}_idle_${row}`, frames: a.generateFrameNumbers(k, { frames: [ri * 4, ri * 4 + 1] }), frameRate: 2, repeat: -1 });
+        a.create({ key: `${k}_walk_${row}`, frames: a.generateFrameNumbers(k, { frames: [ri * 4 + 2, ri * 4 + 3] }), frameRate: 6, repeat: -1 });
+      });
+      for (const row of ['up', 'side']) {
+        if (!a.exists(`${k}_idle_${row}`)) {
+          a.create({ key: `${k}_idle_${row}`, frames: a.generateFrameNumbers(k, { frames: [0, 1] }), frameRate: 2, repeat: -1 });
+          a.create({ key: `${k}_walk_${row}`, frames: a.generateFrameNumbers(k, { frames: [2, 3] }), frameRate: 6, repeat: -1 });
+        }
+      }
       a.create({ key: `${k}_idle`, frames: a.generateFrameNumbers(k, { frames: [0, 1] }), frameRate: 2, repeat: -1 });
       a.create({ key: `${k}_walk`, frames: a.generateFrameNumbers(k, { frames: [2, 3] }), frameRate: 6, repeat: -1 });
     }

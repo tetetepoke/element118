@@ -257,8 +257,22 @@ def npc_sheet(key, frames):
     manifest[key] = {'file': f'sprites/{key}.png', 'frameWidth': 32, 'frameHeight': 32}
 
 
-npc_sheet('hyde', [F(hyde[0][0]), F(hyde[0][1]), F(hyde[1][0]), F(hyde[1][1])])
-npc_sheet('oxy', [F(oxy[0][0]), F(oxy[0][1]), F(oxy[1][0]), F(oxy[1][1])])
+def party_sheet(key, g):
+    """Followers face the same way as Carbon: rows down / up / side(right), cols idle0, idle1, walk0, walk1.
+    The sheet has no back view for these two, so the 'up' row uses the turned (3/4) view."""
+    down = [F(g[0][0]), shift(F(g[0][0]), 0, 1), F(g[1][0]), shift(F(g[1][1]), 0, -1)]
+    side = [F(g[0][3]), shift(F(g[0][3]), 0, 1), F(g[1][3]), shift(F(g[0][3]), 0, -1)]
+    up = [F(g[0][3]), shift(F(g[0][3]), 0, 1), F(g[1][3]), shift(F(g[0][3]), 0, -1)]
+    img = Image.new('RGBA', (128, 96), (0, 0, 0, 0))
+    for r, frames in enumerate((down, up, side)):
+        for c, fr in enumerate(frames):
+            img.alpha_composite(fr, (c * 32, r * 32))
+    img.save(os.path.join(OUT, f'{key}.png'))
+    manifest[key] = {'file': f'sprites/{key}.png', 'frameWidth': 32, 'frameHeight': 32}
+
+
+party_sheet('hyde', hyde)
+party_sheet('oxy', oxy)
 npc_sheet('elder', [F(elder[0][0]), F(elder[0][1]), F(elder[1][0]), F(elder[1][1])])
 yc = [[r[0] for r in grid((c[0] - 2, 700, c[2] + 2, 870), 1)] for c in youth_cols]  # per column: idle, walk, talk, face
 npc_sheet('villager', [F(yc[0][0]), F(yc[1][0]), F(yc[0][1]), F(yc[1][1])])

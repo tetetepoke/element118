@@ -7,7 +7,7 @@ import { Breakling } from '../entities/Enemy';
 import { game, bus, EV, input, ui } from '../core/state';
 import { SCRIPT } from '../data/script';
 import { sfx } from '../core/audio';
-import { facingVector } from '../core/facing';
+import { facingVector, spriteRowFor } from '../core/facing';
 
 interface Interactable {
   id: string;
@@ -614,12 +614,15 @@ export class World extends Phaser.Scene {
     this.followers.forEach((f, i) => {
       const idx = Math.min(this.trail.length - 1, (i + 1) * 12);
       const p = this.trail[idx] ?? { x: this.player.x, y: this.player.y + 10 };
-      const moving = Math.hypot(p.x - f.sprite.x, p.y - f.sprite.y) > 0.5;
-      if (moving) f.sprite.setFlipX(p.x < f.sprite.x);
+      const pv = (this.player.body as Phaser.Physics.Arcade.Body).velocity;
+      const moving = Math.hypot(p.x - f.sprite.x, p.y - f.sprite.y) > 0.5 || Math.hypot(pv.x, pv.y) > 8;
+      // same facing as Carbon
+      const [row, flip] = spriteRowFor(this.player.facing, 4);
+      f.sprite.setFlipX(flip);
       f.sprite.x += (p.x - f.sprite.x) * 0.25;
       f.sprite.y += (p.y - f.sprite.y) * 0.25;
       f.sprite.setDepth(f.sprite.y);
-      const key = moving ? `${f.id}_walk` : `${f.id}_idle`;
+      const key = moving ? `${f.id}_walk_${row}` : `${f.id}_idle_${row}`;
       if (f.sprite.anims.currentAnim?.key !== key) f.sprite.play(key);
     });
   }
