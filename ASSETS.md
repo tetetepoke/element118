@@ -35,6 +35,7 @@
 | `sign` | 16×16 | 1コマ |
 | `goal` | 16×16 | 2コマ |
 | `slash`（攻撃の軌跡、右向きで描く） | 32×32 | 3コマ |
+| `carbon_faces`（カーボンの表情） | 32×32 | 1行9コマ：通常、笑顔、目を閉じて笑う、おどろく、考える、困る、てれる、泣く、ひらめき |
 | `pt_carbon` `pt_carbon_shy` `pt_hyde` `pt_oxy` `pt_elder` `pt_villager`（会話の顔） | 192×192 | 1コマ |
 
 ## キャラクターデザインの基準
@@ -49,7 +50,9 @@
 
 ## 今の素材の出どころ
 
-`python3 scripts/extract-sprites.py` が2枚のシートから切り出しています（人物は **暫定版**。描き直し版ができたものから差し替えます）。
+カーボン（`carbon` `carbon_faces` `pt_carbon` `pt_carbon_shy`）は `python3 scripts/draw-carbon.py` が1ドットずつ描いています（シートからの切り出しではありません）。拡大確認用の画像は `art/sprites-src/carbon_preview_x8.png` と `carbon_faces_preview_x8.png`。
+
+それ以外は `python3 scripts/extract-sprites.py` が2枚のシートから切り出しています（人物は **暫定版**。描き直し版ができたものから差し替えます）。このスクリプトは、描き直し済みのファイルには触れません。
 
 - `art/source/character-sheet.png`（キャラクター スプライトシート）：カーボン、ハイド、オキシ、村長、村人、会話の顔
 - `art/source/concept-sheet.png`（世界観シート）：地面タイル、木・岩・柵、家と風車、HとOの結晶、タイトル絵
