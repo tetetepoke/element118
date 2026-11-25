@@ -176,7 +176,7 @@ export class UI extends Phaser.Scene {
     // ── dialogue box ──
     this.dlg = this.add.container(0, 0).setVisible(false);
     const box = panel(this, 40, GAME_H - 250, GAME_W - 80, 220, 0x10152a, 0.95);
-    this.dlgPortrait = this.add.image(80 + 96, GAME_H - 250 + 110, 'pt_carbon').setDisplaySize(176, 176);
+    this.dlgPortrait = this.add.image(80 + 96, GAME_H - 250 + 110, 'pt_carbon').setDisplaySize(192, 192);
     this.dlgName = txt(this, 290, GAME_H - 236, '', 26, '#8fd3ff', { fontStyle: 'bold' });
     this.dlgText = txt(this, 290, GAME_H - 196, '', 30, '#ffffff', { wordWrap: { width: GAME_W - 400, useAdvancedWrap: true } });
     this.dlgArrow = txt(this, GAME_W - 90, GAME_H - 70, '▼', 26, '#ffd84a');
@@ -401,7 +401,7 @@ export class UI extends Phaser.Scene {
     this.dlg.setVisible(true);
     const sys = line.who === 'sys';
     this.dlgPortrait.setVisible(!sys);
-    if (!sys) this.dlgPortrait.setTexture(`pt_${line.who}`).setDisplaySize(176, 176);
+    if (!sys) this.dlgPortrait.setTexture(`pt_${line.who}`).setDisplaySize(192, 192);
     this.dlgName.setText(SPEAKER_NAME[line.who]);
     this.dlgName.setX(sys ? 80 : 290);
     this.dlgText.setX(sys ? 80 : 290);

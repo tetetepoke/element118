@@ -121,42 +121,125 @@ def squash(fr, fy=0.8):
     return out
 
 
+# ═════════════ characters: from the character sheet (art/source/character-sheet.png) ═════════════
+chars_sheet = Image.open(os.path.join(ROOT, 'art/source/character-sheet.png')).convert('RGBA')
+
+
+def is_bg2(p):
+    r, g, b = p[:3]
+    return min(r, g, b) > 205 and max(r, g, b) - min(r, g, b) < 30
+
+
+def cut2(box):
+    """Crop from the character sheet and remove its light background (flood fill from the edges)."""
+    im = chars_sheet.crop(box).copy()
+    w, h = im.size
+    px = im.load()
+    seen = set()
+    q = deque([(x, 0) for x in range(w)] + [(x, h - 1) for x in range(w)] + [(0, y) for y in range(h)] + [(w - 1, y) for y in range(h)])
+    while q:
+        x, y = q.popleft()
+        if (x, y) in seen or x < 0 or y < 0 or x >= w or y >= h:
+            continue
+        seen.add((x, y))
+        if not is_bg2(px[x, y]):
+            continue
+        px[x, y] = (0, 0, 0, 0)
+        q.extend(((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)))
+    bb = im.getbbox()
+    return im.crop(bb) if bb else im
+
+
+def runs(occ, min_gap=3, min_len=8):
+    out, start, gap, end = [], None, 0, 0
+    for i, v in enumerate(occ):
+        if v:
+            if start is None:
+                start = i
+            gap, end = 0, i
+        elif start is not None:
+            gap += 1
+            if gap >= min_gap:
+                if end - start + 1 >= min_len:
+                    out.append((start, end + 1))
+                start = None
+    if start is not None and end - start + 1 >= min_len:
+        out.append((start, end + 1))
+    return out
+
+
+def grid(box, gap=3):
+    """Find sprite cells in a box by the empty rows/columns between them."""
+    im = chars_sheet.crop(box)
+    w, h = im.size
+    px = im.load()
+    m = [[not is_bg2(px[x, y]) for y in range(h)] for x in range(w)]
+    rows = []
+    for y0, y1 in runs([sum(m[x][y] for x in range(w)) > 1 for y in range(h)], gap):
+        cells = []
+        for x0, x1 in runs([sum(m[x][y] for y in range(y0, y1)) > 1 for x in range(w)], gap):
+            ys = [y for y in range(y0, y1) if any(m[x][y] for x in range(x0, x1))]
+            cells.append((box[0] + x0, box[1] + min(ys), box[0] + x1, box[1] + max(ys) + 1))
+        rows.append(cells)
+    return rows
+
+
+def split_v(cell, n):
+    x0, y0, x1, y1 = cell
+    hgt = (y1 - y0) / n
+    return [(x0, int(y0 + i * hgt), x1, int(y0 + (i + 1) * hgt)) for i in range(n)]
+
+
+def F(box, mirror=False):
+    fr = fit(cut2(box), 32, 32)
+    return ImageOps.mirror(fr) if mirror else fr
+
+
+def pixel_portrait(box, bg, name):
+    """Dialogue face at the same pixel resolution as the 32px sprites: shrink to 32px, then enlarge 6x."""
+    face = cut2(box)
+    small = Image.new('RGBA', (32, 32), bg + (255,))
+    f = fit(face, 32, 32, pad=1)
+    small.alpha_composite(f)
+    small.resize((192, 192), Image.NEAREST).save(os.path.join(OUT, f'{name}.png'))
+    manifest[name] = {'file': f'sprites/{name}.png', 'frameWidth': 192, 'frameHeight': 192}
+
+
 manifest = {}
+top = grid((280, 85, 565, 225))          # 2 rows x 4: front(masked), front, back, side(right)
+act = grid((100, 228, 568, 480))         # rows: idle, walk, attack, dodge, guard
+cfaces = grid((140, 478, 568, 532))      # Carbon talk faces (masked)
+hyde = grid((585, 225, 805, 482))        # rows: idle, walk, attack, dodge, guard
+oxy = grid((818, 225, 1048, 482))
+elder = grid((55, 700, 245, 870))        # rows: idle, walk, talk, faces
+hyde_faces = grid((585, 483, 805, 532), 2)[0]
+oxy_faces = grid((818, 483, 1048, 532), 2)[0]
+youth_cols = grid((1250, 700, 1392, 870), 2)[0]
+faces_common = grid((15, 920, 712, 985))[0]  # 通常, 笑顔, 目を閉じて笑う, おどろく, 考える, 困る, てれる, がんばる, 泣く, ひらめき
 
 # ───────────── Carbon (player): 14 cols x 3 rows of 32x32 ─────────────
-front = cut((285, 405, 390, 575))
-side = cut((395, 405, 495, 575))
-back = cut((500, 405, 615, 575))
-walk_boxes = [(318 + i * 63, 735, 318 + (i + 1) * 63, 825) for i in range(6)]
-walks = [cut(b) for b in walk_boxes]
-
+# Overworld frames keep the mask on (character setting). The side view faces right.
 FW = FH = 32
-f_front, f_back = fit(front, FW, FH), fit(back, FW, FH)
-f_side = ImageOps.mirror(fit(side, FW, FH))  # concept pose faces left; the sheet row is right-facing
+down_a = F(top[1][0])
+down_b = down_a  # top[0][0] has a flame aura (C+O look), not used for the basic form
+up_a, up_b = F(top[0][2]), F(top[1][2])
+side_a, side_b = F(top[0][3]), F(top[1][3])
+atk_side = [F(act[2][0], True), F(act[2][1], True), F(act[2][3], True)]  # attack frames face left in the sheet
+dodge_side = F(act[3][1], True)
 
 
-def facing_right(fr):
-    """The concept walk frames 1-3 face left, 4-6 face right. Normalise to right-facing."""
-    return fr
-
-
-walk_right = [fit(w, FW, FH) for w in walks[3:6]]
-walk_left_as_right = [ImageOps.mirror(fit(w, FW, FH)) for w in walks[0:3]]
-side_walk = [walk_right[0], walk_left_as_right[1], walk_right[2], walk_left_as_right[0]]
-
-
-def row_frames(base, walk=None):
-    idle = [base, shift(base, 0, 1)]
-    wk = walk or [base, shift(base, 0, -1), base, shift(base, 0, -1)]
-    attack = [shift(base, 0, -1), shift(base, 1, 0), shift(base, 1, 1)]
-    dodge = [squash(base, 0.72)]
-    guard = [shift(base, 0, 1)]
-    hurt = [tint(base, (255, 80, 80), 0.45)]
-    bond = [tint(base, (127, 224, 255), 0.25), shift(tint(base, (127, 224, 255), 0.4), 0, -1)]
+def row_frames(a, b, attack=None, dodge=None):
+    idle = [a, shift(a, 0, 1)]
+    wk = [a, shift(b, 0, -1), a, shift(b, 0, -1)]
+    attack = attack or [shift(a, 0, -1), shift(a, 1, 0), shift(a, 1, 1)]
+    dodge = [dodge or squash(a, 0.72)]
+    guard = [shift(a, 0, 1)]
+    hurt = [tint(a, (255, 80, 80), 0.45)]
+    bond = [tint(a, (127, 224, 255), 0.25), shift(tint(a, (127, 224, 255), 0.4), 0, -1)]
     return idle + wk + attack + dodge + guard + hurt + bond
 
 
-rows = [row_frames(f_front), row_frames(f_back), row_frames(f_side, side_walk)]
+rows = [row_frames(down_a, down_b), row_frames(up_a, up_b), row_frames(side_a, side_b, atk_side, dodge_side)]
 carbon = Image.new('RGBA', (FW * 14, FH * 3), (0, 0, 0, 0))
 for r, frames in enumerate(rows):
     for c, fr in enumerate(frames):
@@ -164,37 +247,29 @@ for r, frames in enumerate(rows):
 carbon.save(os.path.join(OUT, 'carbon.png'))
 manifest['carbon'] = {'file': 'sprites/carbon.png', 'frameWidth': 32, 'frameHeight': 32, 'directions': 4}
 
-# ───────────── element characters (NPC sheets: idle0, idle1, walk0, walk1) ─────────────
-chars = {
-    'oxy': (1022, 398, 1110, 508),
-    'hyde': (1125, 398, 1210, 508),
-}
-for key, box in chars.items():
-    base = fit(cut(box), 32, 32)
-    sheet_img = Image.new('RGBA', (128, 32), (0, 0, 0, 0))
-    for i, fr in enumerate([base, shift(base, 0, 1), shift(base, 0, -1), base]):
-        sheet_img.alpha_composite(fr, (i * 32, 0))
-    sheet_img.save(os.path.join(OUT, f'{key}.png'))
+
+# ───────────── NPC sheets (one row: idle0, idle1, walk0, walk1) ─────────────
+def npc_sheet(key, frames):
+    img = Image.new('RGBA', (128, 32), (0, 0, 0, 0))
+    for i, fr in enumerate(frames):
+        img.alpha_composite(fr, (i * 32, 0))
+    img.save(os.path.join(OUT, f'{key}.png'))
     manifest[key] = {'file': f'sprites/{key}.png', 'frameWidth': 32, 'frameHeight': 32}
 
-# ───────────── portraits (192x192) ─────────────
-def portrait(box, bg, name, extra_bottom=True):
-    im = cut(box)
-    canvas = Image.new('RGBA', (192, 192), bg + (255,))
-    w, h = im.size
-    s = max(176 / w, 176 / h) if w < h * 0.9 else 184 / w
-    s = min(s, 192 * 1.15 / h if extra_bottom else 184 / h)
-    nw, nh = int(w * s), int(h * s)
-    img = im.resize((nw, nh), Image.LANCZOS)
-    canvas.alpha_composite(img, ((192 - nw) // 2, 192 - nh if extra_bottom else (192 - nh) // 2))
-    canvas.save(os.path.join(OUT, f'{name}.png'))
-    manifest[name] = {'file': f'sprites/{name}.png', 'frameWidth': 192, 'frameHeight': 192}
 
+npc_sheet('hyde', [F(hyde[0][0]), F(hyde[0][1]), F(hyde[1][0]), F(hyde[1][1])])
+npc_sheet('oxy', [F(oxy[0][0]), F(oxy[0][1]), F(oxy[1][0]), F(oxy[1][1])])
+npc_sheet('elder', [F(elder[0][0]), F(elder[0][1]), F(elder[1][0]), F(elder[1][1])])
+yc = [[r[0] for r in grid((c[0] - 2, 700, c[2] + 2, 870), 1)] for c in youth_cols]  # per column: idle, walk, talk, face
+npc_sheet('villager', [F(yc[0][0]), F(yc[1][0]), F(yc[0][1]), F(yc[1][1])])
 
-portrait((18, 400, 285, 690), (38, 48, 77), 'pt_carbon_shy')
-portrait((60, 400, 285, 640), (38, 48, 77), 'pt_carbon')
-portrait((1125, 398, 1210, 470), (31, 58, 90), 'pt_hyde')
-portrait((1022, 398, 1110, 470), (74, 31, 46), 'pt_oxy')
+# ───────────── dialogue faces (pixel resolution, 192x192) ─────────────
+pixel_portrait(cfaces[0][-1], (38, 48, 77), 'pt_carbon')
+pixel_portrait(faces_common[6], (38, 48, 77), 'pt_carbon_shy')  # てれる
+pixel_portrait(hyde_faces[0], (31, 58, 90), 'pt_hyde')
+pixel_portrait(oxy_faces[0], (74, 31, 46), 'pt_oxy')
+pixel_portrait(elder[3][0], (46, 58, 38), 'pt_elder')
+pixel_portrait(yc[0][3], (42, 48, 64), 'pt_villager')
 
 # ───────────── crystals (16x16: shine, shine+, empty socket) ─────────────
 for key, box in (('crystal_H', (92, 875, 148, 952)), ('crystal_O', (148, 875, 204, 952))):

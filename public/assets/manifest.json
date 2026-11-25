@@ -5,23 +5,33 @@
     "frameHeight": 32,
     "directions": 4
   },
-  "oxy": {
-    "file": "sprites/oxy.png",
-    "frameWidth": 32,
-    "frameHeight": 32
-  },
   "hyde": {
     "file": "sprites/hyde.png",
     "frameWidth": 32,
     "frameHeight": 32
   },
-  "pt_carbon_shy": {
-    "file": "sprites/pt_carbon_shy.png",
-    "frameWidth": 192,
-    "frameHeight": 192
+  "oxy": {
+    "file": "sprites/oxy.png",
+    "frameWidth": 32,
+    "frameHeight": 32
+  },
+  "elder": {
+    "file": "sprites/elder.png",
+    "frameWidth": 32,
+    "frameHeight": 32
+  },
+  "villager": {
+    "file": "sprites/villager.png",
+    "frameWidth": 32,
+    "frameHeight": 32
   },
   "pt_carbon": {
     "file": "sprites/pt_carbon.png",
+    "frameWidth": 192,
+    "frameHeight": 192
+  },
+  "pt_carbon_shy": {
+    "file": "sprites/pt_carbon_shy.png",
     "frameWidth": 192,
     "frameHeight": 192
   },
@@ -32,6 +42,16 @@
   },
   "pt_oxy": {
     "file": "sprites/pt_oxy.png",
+    "frameWidth": 192,
+    "frameHeight": 192
+  },
+  "pt_elder": {
+    "file": "sprites/pt_elder.png",
+    "frameWidth": 192,
+    "frameHeight": 192
+  },
+  "pt_villager": {
+    "file": "sprites/pt_villager.png",
     "frameWidth": 192,
     "frameHeight": 192
   },
