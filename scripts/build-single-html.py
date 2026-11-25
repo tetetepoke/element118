@@ -2,9 +2,9 @@
 import base64, glob, json, os, re, subprocess
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 tmp = os.path.join(ROOT, 'dist-single', '_build')
-subprocess.run(['npx', 'vite', 'build', '--base=./', '--outDir', tmp, '--emptyOutDir'], cwd=ROOT, check=True, capture_output=True)
+subprocess.run(['npx', 'vite', 'build', '--base=./', '--outDir', tmp, '--emptyOutDir'], cwd=ROOT, check=True, capture_output=True, env={**os.environ, 'E118_SINGLE': '1'})
 html = open(os.path.join(tmp, 'index.html'), encoding='utf-8').read()
-js = open(glob.glob(os.path.join(tmp, 'assets', 'index-*.js'))[0], encoding='utf-8').read()
+js = open((glob.glob(os.path.join(tmp, 'assets', 'main-*.js')) + glob.glob(os.path.join(tmp, 'assets', 'index-*.js')))[0], encoding='utf-8').read()
 manifest = json.load(open(os.path.join(ROOT, 'public/assets/manifest.json'), encoding='utf-8'))
 for k, v in manifest.items():
     if isinstance(v, dict) and 'file' in v:

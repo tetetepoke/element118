@@ -75,4 +75,5 @@ scripts/
 
 [ASSETS.md](ASSETS.md) を参照。PNGを置いて `public/assets/manifest.json` に1行書くだけで、仮素材と入れ替わります。
 ステージ2「珪晶の谷」の設計と実装方針は [docs/STAGE2_PLAN.md](docs/STAGE2_PLAN.md)。
+3D技術検証プロトタイプ（`/element118/3d/`）は [docs/3D_PROTOTYPE.md](docs/3D_PROTOTYPE.md)。
 キャラクターの見た目は [docs/CHARACTER_DESIGN.md](docs/CHARACTER_DESIGN.md)（正式な基準画像：`art/reference/character-design-reference.png`）に合わせます。

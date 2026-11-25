@@ -91,6 +91,9 @@ export class Title extends Phaser.Scene {
     let confirmPending = false;
 
     txt(this, 24, GAME_H - 40, `v${VERSION}　プロトタイプ`, 20, hasArt ? '#ffffff' : '#1b2a55', hasArt ? { backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 8, y: 3 } } : {});
+    // separate 3D technology prototype (its own page; shares no save data with the 2D game)
+    const to3d = txt(this, GAME_W - 24, GAME_H - 40, '3D試作（技術検証）▶', 20, '#ffffff', { backgroundColor: 'rgba(20,24,42,0.7)', padding: { x: 10, y: 5 } }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+    to3d.on('pointerdown', () => { window.location.href = new URL("3d/", document.baseURI.replace(/[^/]*$/, "")).href; });
     if (!hasArt) txt(this, GAME_W - 24, GAME_H - 40, 'iPhoneは横向きで / ホーム画面に追加すると全画面', 20, '#1b2a55').setOrigin(1, 0);
 
     // iOS needs a gesture to unlock audio; any tap does it.

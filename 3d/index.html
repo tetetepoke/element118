@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#14182a" />
+    <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png?v=2" />
+    <link rel="icon" href="../icons/icon-192.png?v=2" />
+    <title>ELEMENT 118 — 3D試作</title>
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #14182a; touch-action: none;
+        -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none;
+        font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif; color: #fff; }
+      #view { position: fixed; inset: 0; touch-action: none; }
+      #view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+      .hud { position: fixed; z-index: 2; pointer-events: none; }
+      #top { top: calc(env(safe-area-inset-top) + 10px); left: calc(env(safe-area-inset-left) + 12px); display: flex; gap: 10px; align-items: center; }
+      #top .title { font-weight: bold; font-size: 15px; text-shadow: 0 1px 3px #000; }
+      a.link, button.small { pointer-events: auto; background: rgba(16, 21, 42, 0.75); color: #cfe8ff; border: 1px solid #8fa5c8; border-radius: 10px;
+        padding: 6px 10px; font-size: 13px; text-decoration: none; font-family: inherit; }
+      #topR { top: calc(env(safe-area-inset-top) + 10px); right: calc(env(safe-area-inset-right) + 12px); display: flex; gap: 8px; align-items: center; }
+      #form { background: rgba(90, 74, 184, 0.85); border-radius: 10px; padding: 6px 10px; font-weight: bold; font-size: 14px; display: none; }
+      #prompt { left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translateX(-50%); background: rgba(16, 21, 42, 0.8);
+        padding: 8px 16px; border-radius: 12px; font-size: 16px; display: none; white-space: nowrap; }
+      #banner { left: 50%; top: 22%; transform: translateX(-50%); text-align: center; display: none; }
+      #banner .big { font-size: 40px; font-weight: 900; color: #ffd84a; text-shadow: 0 3px 10px #000, 0 0 2px #000; letter-spacing: 1px; }
+      #banner .sub { font-size: 20px; margin-top: 6px; text-shadow: 0 2px 6px #000; }
+      #msg { left: 50%; bottom: calc(env(safe-area-inset-bottom) + 76px); transform: translateX(-50%); max-width: 80vw; background: rgba(16, 21, 42, 0.88);
+        border: 1px solid #8fa5c8; padding: 10px 16px; border-radius: 12px; font-size: 15px; line-height: 1.55; display: none; }
+      #debug { left: calc(env(safe-area-inset-left) + 12px); bottom: calc(env(safe-area-inset-bottom) + 8px); font-size: 12px; opacity: 0.75; text-shadow: 0 1px 2px #000; }
+      #help { right: calc(env(safe-area-inset-right) + 12px); bottom: calc(env(safe-area-inset-bottom) + 8px); font-size: 12px; opacity: 0.85; text-align: right; line-height: 1.5; text-shadow: 0 1px 2px #000; }
+      .btn { position: fixed; z-index: 3; border-radius: 50%; display: none; align-items: center; justify-content: center; font-weight: bold; color: #fff;
+        border: 3px solid rgba(255, 255, 255, 0.75); background: rgba(40, 60, 90, 0.55); touch-action: none; font-size: 15px; text-align: center; line-height: 1.1; }
+      .btn.down { filter: brightness(1.5); transform: scale(0.94); }
+      body.touch .btn { display: flex; }
+      body.touch #help { display: none; }
+      #bJump { width: 92px; height: 92px; right: calc(env(safe-area-inset-right) + 26px); bottom: calc(env(safe-area-inset-bottom) + 26px); background: rgba(31, 106, 138, 0.6); }
+      #bAct { width: 78px; height: 78px; right: calc(env(safe-area-inset-right) + 132px); bottom: calc(env(safe-area-inset-bottom) + 40px); background: rgba(160, 120, 40, 0.6); font-size: 13px; }
+      #bBreak { width: 66px; height: 66px; right: calc(env(safe-area-inset-right) + 40px); bottom: calc(env(safe-area-inset-bottom) + 134px); background: rgba(216, 88, 74, 0.65); font-size: 12px; }
+      #bBreak.hide, #bAct.hide { display: none !important; }
+      #stickBase, #stickKnob { position: fixed; z-index: 3; display: none; pointer-events: none; left: 0; top: 0; border-radius: 50%; }
+      #stickBase { width: 140px; height: 140px; background: rgba(255, 255, 255, 0.12); border: 3px solid rgba(255, 255, 255, 0.35); }
+      #stickKnob { width: 60px; height: 60px; background: rgba(255, 255, 255, 0.45); }
+      #codex { position: fixed; inset: 0; z-index: 5; background: rgba(5, 7, 15, 0.86); display: none; align-items: center; justify-content: center; pointer-events: auto; }
+      #codex .panel { width: min(1000px, 92vw); max-height: 86vh; overflow: auto; background: #10152a; border: 2px solid #9fb8ff; border-radius: 16px; padding: 18px 22px; }
+      #codex h2 { margin: 0 0 6px; font-size: 22px; }
+      #codex .cols { display: flex; gap: 18px; flex-wrap: wrap; }
+      #codex .col { flex: 1 1 300px; background: #161d38; border-radius: 12px; padding: 10px 14px; }
+      #codex .col h3 { margin: 4px 0 8px; font-size: 16px; }
+      #codex .real h3 { color: #ffffff; } #codex .fic h3 { color: #9fe0b8; }
+      #codex ul { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.6; }
+      #codex .note { font-size: 12px; color: #8fa5c8; margin-top: 10px; }
+      #rotate { display: none; position: fixed; inset: 0; z-index: 10; background: #14182a; align-items: center; justify-content: center; flex-direction: column; gap: 14px; font-size: 20px; }
+      @media (orientation: portrait) and (max-width: 900px) { body.touch #rotate { display: flex; } }
+      #fail { display: none; position: fixed; inset: 0; z-index: 11; background: #14182a; align-items: center; justify-content: center; text-align: center; padding: 20px; }
+    </style>
+  </head>
+  <body>
+    <div id="view"></div>
+    <div id="top" class="hud"><span class="title">ELEMENT 118　3D試作</span><a class="link" href="../">◀ 2D版へ</a></div>
+    <div id="topR" class="hud"><span id="form">SiC FORM</span><button class="small" id="bCodex">図鑑</button></div>
+    <div id="banner" class="hud"><div class="big"></div><div class="sub"></div></div>
+    <div id="msg" class="hud"></div>
+    <div id="prompt" class="hud"></div>
+    <div id="debug" class="hud"></div>
+    <div id="help" class="hud">WASD 移動 ／ Shift 走る ／ Space ジャンプ（段差に向かって押すと登る）<br />マウス カメラ（クリックで固定・Escで解除） ／ E BOND・HARD BREAK・しらべる ／ Q BREAK ／ C 図鑑</div>
+    <div class="btn" id="bJump">JUMP</div>
+    <div class="btn hide" id="bAct">BOND</div>
+    <div class="btn hide" id="bBreak">BREAK</div>
+    <div id="stickBase"></div><div id="stickKnob"></div>
+    <div id="codex"><div class="panel" id="codexPanel"></div></div>
+    <div id="rotate"><div>📱↻</div><div>横にしてね</div></div>
+    <div id="fail"><div>この端末では3D表示（WebGL）が使えないようです。<br /><a class="link" href="../">2D版へもどる</a></div></div>
+    <script type="module" src="/src3d/main.ts"></script>
+  </body>
+</html>
