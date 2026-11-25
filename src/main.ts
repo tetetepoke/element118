@@ -29,5 +29,24 @@ const game = new Phaser.Game({
   scene: [Boot, Title, World, Valley, UI, BondPanel, Ceremony, Codex, Menu, StageClear, FormBond, PartySelect, MapView, Periodic],
 });
 
+// iOS Safari ignores user-scalable=no: block pinch / double-tap zoom so the screen never grows
+// past the buttons, and re-fit the canvas whenever the visible area changes.
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  if (now - lastTouchEnd < 350) e.preventDefault();
+  lastTouchEnd = now;
+}, { passive: false });
+document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+const refit = () => setTimeout(() => {
+  if (window.visualViewport && window.visualViewport.scale !== 1) window.scrollTo(0, 0);
+  game.scale.refresh();
+}, 120);
+window.visualViewport?.addEventListener('resize', refit);
+window.addEventListener('orientationchange', refit);
+window.addEventListener('resize', refit);
+
 // for automated tests
 (window as unknown as { __game: Phaser.Game }).__game = game;
