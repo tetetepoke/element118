@@ -26,7 +26,7 @@ const L = (who: Speaker, text: string): Line => ({ who, text });
 
 export const SCRIPT: Record<string, Line[]> = {
   intro_narration: [
-    L('sys', 'かつて世界アトミアは、元素どうしの「結合」で形づくられていた。'),
+    L('sys', 'かつてこの世界は、元素どうしの「結合」で形づくられていた。'),
     L('sys', 'けれどある日、その結合がほどけはじめた。水も、草木も、家も、少しずつ崩れていく。'),
     L('sys', '人びとはそれを「THE BREAK（大分離）」と呼んだ。'),
   ],

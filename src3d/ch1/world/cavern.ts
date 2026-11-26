@@ -36,7 +36,7 @@ const V = (x: number, z: number) => new THREE.Vector2(x, z);
 export const ZONES: Zone[] = [
   { id: 'dump', name: '第七廃棄区', sub: 'だいななはいきく', c: V(20, 120), rx: 34, rz: 26, y: 0, clear: 26, rough: 0.8, tint: 0x5a4a3c, ceilTint: 0x2a2420 },
   { id: 'cave', name: '廃棄区の奥', sub: '誰も入れなかった場所', c: V(-30, 128), rx: 8, rz: 7, y: 0.5, clear: 7, rough: 0.3, tint: 0x4a4038, ceilTint: 0x241f1c },
-  { id: 'city', name: '地下都市', sub: 'ネオ・ラディクス', c: V(10, 20), rx: 60, rz: 50, y: 4, clear: 66, rough: 0.25, tint: 0x6a5f54, ceilTint: 0x1e1c22 },
+  { id: 'city', name: '地下都市', sub: 'アトミア', c: V(10, 20), rx: 60, rz: 50, y: 4, clear: 66, rough: 0.25, tint: 0x6a5f54, ceilTint: 0x1e1c22 },
   { id: 'river', name: '地下水脈', sub: 'くらい川が流れる場所', c: V(-78, -25), rx: 34, rz: 28, y: 14, clear: 28, rough: 0.6, tint: 0x3c4a50, ceilTint: 0x1a2228 },
   { id: 'fungus', name: '菌類の森', sub: '光る菌が育つ層', c: V(-60, -85), rx: 30, rz: 24, y: 22, clear: 30, rough: 0.7, tint: 0x4a3c58, ceilTint: 0x221a2a },
   { id: 'mineral', name: '鉱物層', sub: '赤い岩と砂の層', c: V(10, -95), rx: 32, rz: 24, y: 32, clear: 28, rough: 0.9, tint: 0x7a5440, ceilTint: 0x2c1e18 },

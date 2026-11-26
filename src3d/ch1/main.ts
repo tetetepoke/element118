@@ -337,7 +337,7 @@ async function cityReveal() {
     setCine(p.x + 2, p.y + 3, p.z + 3, p.x, p.y + 1.4, p.z - 4, true);
     await wait(400);
     setCine(22, 26, 74, 8, 6, 10);
-    ui.area('地下都市', 'ネオ・ラディクス');
+    ui.area('地下都市', 'アトミア');
     sfx.chime(true);
     await wait(3400);
     setCine(-10, 20, 46, 40, 20, 0);
