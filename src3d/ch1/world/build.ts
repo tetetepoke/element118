@@ -106,6 +106,13 @@ export function buildWorld() {
       root.add(new THREE.Mesh(new THREE.TubeGeometry(strand, Math.max(40, pts.length * 20), Math.max(0.05, r * 0.07), 4, false), veinMat));
     }
     for (let i = 0; i <= 2; i++) lights.push({ pos: curve.getPoint(0.15 + i * 0.35), color: 0x4a9aff, power: 1.3 + r * 0.25 });
+    // solid: neither Carbon nor the camera goes through a root
+    const len = curve.getLength();
+    const n = Math.max(2, Math.ceil(len / (r * 1.2)));
+    for (let i = 0; i <= n; i++) {
+      const p = curve.getPoint(i / n);
+      colliders.add({ id: `root_${id}_${i}`, kind: 'cyl', x: p.x, z: p.z, r: r * 0.95, bottom: p.y - r, top: p.y + r, tags: ['root'] });
+    }
     things.push({ id: `root_${id}`, kind: 'scan', mat: 'blue_root', pos: curve.getPoint(0.5), r: r + 6, label: '青い根' });
     return curve;
   };
@@ -282,6 +289,7 @@ export function buildWorld() {
         wdw.position.z = -d / 2 - 0.02;
         m.add(wdw);
       }
+      colliders.add({ id: `house${i}_${k}`, kind: 'box', x: m.position.x, z: m.position.z, hx: w / 2, hz: d / 2, rot: a - Math.PI / 2, bottom: y, top: y + h });
       if (k === 0) colliders.add({ id: `house${i}`, kind: 'box', x: m.position.x, z: m.position.z, hx: w / 2, hz: d / 2, rot: a - Math.PI / 2, bottom: y - 2, top: y + h });
     }
     if (i % 7 === 0) lights.push({ pos: new THREE.Vector3(x - Math.cos(a) * 4, city.y + 6, z - Math.sin(a) * 4), color: 0xffb070, power: 2.5 });

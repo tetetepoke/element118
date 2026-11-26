@@ -23,6 +23,7 @@
       #toolTag { background: rgba(16, 21, 42, 0.75); border: 1px solid #8fa5c8; border-radius: 10px; padding: 5px 10px; font-size: 12px; display: none; }
       button.small { pointer-events: auto; background: rgba(16, 21, 42, 0.75); color: #cfe8ff; border: 1px solid #8fa5c8; border-radius: 10px; padding: 6px 10px; font-size: 13px; font-family: inherit; }
       button.small.hide { display: none; }
+      body.input-keyboard #prompt { bottom: calc(env(safe-area-inset-bottom) + 56px); }
       #prompt { left: 50%; bottom: calc(env(safe-area-inset-bottom) + 22px); transform: translateX(-50%); background: rgba(10, 16, 32, 0.82); padding: 7px 16px; border-radius: 12px; font-size: 15px; display: none; white-space: nowrap; }
       #area { left: 50%; top: 18%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity 0.8s; }
       #area .n { font-size: 34px; font-weight: 900; letter-spacing: 6px; text-shadow: 0 2px 12px #000; } #area .s { font-size: 14px; color: #b8d0f0; letter-spacing: 3px; margin-top: 4px; }
@@ -66,7 +67,18 @@
       .btn { position: fixed; z-index: 3; border-radius: 50%; display: none; align-items: center; justify-content: center; font-weight: bold; color: #fff; pointer-events: auto;
         border: 3px solid rgba(255, 255, 255, 0.7); background: rgba(40, 60, 90, 0.55); touch-action: none; font-size: 13px; text-align: center; line-height: 1.1; }
       .btn.down { filter: brightness(1.5); transform: scale(0.94); }
-      body.touch .btn { display: flex; } body.touch .btn.hide { display: none; } body.touch #help { display: none; }
+      /* which controls are shown follows the last device used (touch / keyboard / gamepad) */
+      body.input-touch .btn { display: flex; } body.input-touch .btn.hide { display: none; } body:not(.input-keyboard) #help { display: none; }
+      #padHelp { display: none; right: calc(env(safe-area-inset-right) + 12px); bottom: calc(env(safe-area-inset-bottom) + 10px); font-size: 13px; line-height: 1.9; text-align: right;
+        background: rgba(6, 10, 22, 0.6); padding: 6px 12px; border-radius: 12px; }
+      body.input-gamepad #padHelp { display: block; }
+      #padHelp b { display: inline-block; min-width: 22px; padding: 0 5px; margin-left: 10px; border-radius: 11px; background: #e8ecf4; color: #10162a; text-align: center; font-size: 12px; }
+      #camBase, #camKnob { position: fixed; z-index: 3; display: none; pointer-events: none; left: 0; top: 0; border-radius: 50%; }
+      #camBase { width: 140px; height: 140px; background: rgba(120, 180, 255, 0.1); border: 3px solid rgba(160, 210, 255, 0.35); }
+      #camKnob { width: 60px; height: 60px; background: rgba(160, 210, 255, 0.45); }
+      #stickHint { display: none; position: fixed; bottom: calc(env(safe-area-inset-bottom) + 10px); left: 0; right: 0; z-index: 2; pointer-events: none; font-size: 11px; color: rgba(255,255,255,0.5); }
+      body.input-touch #stickHint { display: flex; justify-content: space-between; padding: 0 calc(env(safe-area-inset-left) + 30px) 0 calc(env(safe-area-inset-left) + 30px); }
+      .setrow { display: flex; align-items: center; gap: 12px; margin: 10px 0; font-size: 14px; } .setrow span { width: 190px; } .setrow input[type=range] { flex: 1; }
       #bJump { width: 88px; height: 88px; right: calc(env(safe-area-inset-right) + 24px); bottom: calc(env(safe-area-inset-bottom) + 24px); background: rgba(31, 106, 138, 0.6); }
       #bAct { width: 74px; height: 74px; right: calc(env(safe-area-inset-right) + 124px); bottom: calc(env(safe-area-inset-bottom) + 34px); background: rgba(160, 120, 40, 0.6); }
       #bScan { width: 62px; height: 62px; right: calc(env(safe-area-inset-right) + 36px); bottom: calc(env(safe-area-inset-bottom) + 124px); background: rgba(60, 140, 200, 0.6); font-size: 12px; }
@@ -79,7 +91,7 @@
       #help { bottom: calc(env(safe-area-inset-bottom) + 8px); font-size: 11px; opacity: 0.7; text-align: right; line-height: 1.5; text-shadow: 0 1px 2px #000; }
       #debug { left: calc(env(safe-area-inset-left) + 10px); bottom: calc(env(safe-area-inset-bottom) + 6px); font-size: 11px; opacity: 0.6; }
       #rotate { display: none; position: fixed; inset: 0; z-index: 20; background: #000; align-items: center; justify-content: center; flex-direction: column; gap: 14px; font-size: 20px; }
-      @media (orientation: portrait) and (max-width: 900px) { body.touch #rotate { display: flex; } }
+      @media (orientation: portrait) and (max-width: 900px) { body.input-touch #rotate { display: flex; } }
       #fail { display: none; position: fixed; inset: 0; z-index: 21; background: #000; align-items: center; justify-content: center; text-align: center; padding: 20px; }
       #end { position: fixed; inset: 0; z-index: 10; background: #000; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; text-align: center; pointer-events: auto; }
       #end .c { font-size: 15px; letter-spacing: 4px; color: #8fc8ff; } #end .t { font-size: 30px; font-weight: 900; letter-spacing: 6px; } #end .q { font-size: 14px; color: #8fa5c8; line-height: 2; margin-top: 10px; }
@@ -89,7 +101,7 @@
   <body>
     <div id="view"></div>
     <div id="mission" class="hud safeT safeL"><div class="k">MISSION</div><div class="t"></div><div class="s"></div></div>
-    <div id="topR" class="hud safeT safeR"><span id="toolTag"></span><span id="form">SiC FORM</span><button class="small hide" id="bBagTop">持ち物・つくる</button><button class="small hide" id="bCodex">図鑑</button></div>
+    <div id="topR" class="hud safeT safeR"><span id="toolTag"></span><span id="form">SiC FORM</span><button class="small hide" id="bBagTop">持ち物・つくる</button><button class="small hide" id="bCodex">図鑑</button><button class="small" id="bSettings">設定</button></div>
     <div id="area" class="hud"><div class="n"></div><div class="s"></div><div class="line"></div></div>
     <div id="toast" class="hud"></div>
     <div id="prompt" class="hud"></div>
@@ -97,17 +109,20 @@
     <div id="caption" class="hud"></div>
     <div id="titleCard"><div class="t">ELEMENT 118</div><div class="s">118 ELEMENTS. INFINITE CONNECTIONS.</div></div>
     <div id="fade"></div>
-    <div id="help" class="hud safeR">WASD 移動 ／ Shift 走る ／ Space ジャンプ（段差に向かって押すと登る） ／ マウス カメラ<br />E 話す・拾う・使う ／ R スキャン ／ B 持ち物・つくる ／ Q BOND・BREAK ／ C 図鑑</div>
+    <div id="help" class="hud safeR">WASD 移動（カメラの向き基準） ／ Shift 走る ／ Space ジャンプ（段差に向かって押すと登る） ／ マウスドラッグ カメラ<br />E 話す・拾う・使う ／ R スキャン ／ B 持ち物・つくる ／ Q BOND・BREAK ／ Z・X 道具切替 ／ C 図鑑</div>
     <div id="debug" class="hud"></div>
     <div class="btn" id="bJump">JUMP</div>
     <div class="btn hide" id="bAct">E</div>
     <div class="btn hide" id="bScan">SCAN</div>
     <div class="btn hide" id="bForm">BOND</div>
     <div class="btn" id="bRun">RUN</div>
-    <div id="stickBase"></div><div id="stickKnob"></div>
+    <div id="stickBase"></div><div id="stickKnob"></div><div id="camBase"></div><div id="camKnob"></div>
+    <div id="stickHint"><span>← 左の指：いどう</span><span style="margin-right:200px">右の指：カメラ →</span></div>
+    <div id="padHelp" class="hud"></div>
     <div class="panelWrap" id="scanWrap"><div class="panel" id="scanPanel"></div></div>
     <div class="panelWrap" id="bagWrap"><div class="panel" id="bagPanel"></div></div>
     <div class="panelWrap" id="codexWrap"><div class="panel" id="codexPanel"></div></div>
+    <div class="panelWrap" id="settingsWrap"><div class="panel" id="settingsPanel"></div></div>
     <div id="start"><div class="t">ELEMENT 118</div><div class="s">第1章　根は、上から来る</div><button id="bNew">はじめる</button><button id="bCont" style="display:none">つづきから</button><a href="../">2D版へ</a></div>
     <div id="end"></div>
     <div id="rotate"><div>📱↻</div><div>横にしてね</div></div>

@@ -112,11 +112,18 @@ export class ColliderWorld {
   /** Does the segment pass through a solid (for the camera)? Returns the free fraction 0..1. */
   sweep(ax: number, ay: number, az: number, bx: number, by: number, bz: number, margin: number) {
     const steps = 24;
+    // only colliders near the ray are tested
+    const minX = Math.min(ax, bx) - margin, maxX = Math.max(ax, bx) + margin, minZ = Math.min(az, bz) - margin, maxZ = Math.max(az, bz) + margin;
+    const near = this.list.filter((c) => {
+      if (!c.enabled || c.cameraIgnore) return false;
+      const e = c.kind === 'cyl' ? c.r ?? 0 : Math.hypot(c.hx ?? 0, c.hz ?? 0);
+      return c.x + e >= minX && c.x - e <= maxX && c.z + e >= minZ && c.z - e <= maxZ;
+    });
     for (let i = 1; i <= steps; i++) {
       const t = i / steps;
       const x = ax + (bx - ax) * t, y = ay + (by - ay) * t, z = az + (bz - az) * t;
       if (y < heightAt(x, z) + margin) return (i - 1) / steps;
-      for (const c of this.list) {
+      for (const c of near) {
         if (!c.enabled || c.cameraIgnore) continue;
         if (y > c.top + margin || y < c.bottom) continue;
         if (this.contains(c, x, z, margin)) return (i - 1) / steps;

@@ -8,7 +8,7 @@ const $ = (id: string) => document.getElementById(id)!;
 export const ui = {
   /** true while any blocking panel or dialogue is open */
   busy() {
-    return sayOpen || ['scanWrap', 'bagWrap', 'codexWrap'].some((id) => $(id).style.display === 'flex');
+    return sayOpen || ['scanWrap', 'bagWrap', 'codexWrap', 'settingsWrap'].some((id) => $(id).style.display === 'flex');
   },
   fade(black: boolean, ms = 900) {
     const f = $('fade');
@@ -105,7 +105,7 @@ export const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, autoA
 
 $('say').addEventListener('click', () => ui.advance());
 $('say').addEventListener('touchstart', (e) => { e.preventDefault(); ui.advance(); }, { passive: false });
-for (const id of ['scanWrap', 'bagWrap', 'codexWrap']) {
+for (const id of ['scanWrap', 'bagWrap', 'codexWrap', 'settingsWrap']) {
   $(id).addEventListener('click', (e) => { if (e.target === $(id)) ui.close(id); });
 }
 

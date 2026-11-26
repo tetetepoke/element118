@@ -6,7 +6,8 @@ import { setGround } from '../world/ground';
 import { caveGround, ceilAt, heightAt, waterAt, zoneAt, SPOTS, RIVER, ZONES, type Zone } from './world/cavern';
 setGround(caveGround);
 import { buildWorld, type Thing } from './world/build';
-import { input, endFrame, initKeyboardMouse, initTouch, bindButton, pollInput } from '../core/input';
+import { input, endFrame, initKeyboardMouse, initTouch, bindButton, bindAction, pollInput, onDeviceChange, onGamepad, getLastDevice, padLabel, applySettings, settings as inputSettings } from '../core/input';
+import type { ActionName } from '../core/inputConfig';
 import { ThirdPersonCamera } from '../core/camera';
 import { PlayerController } from '../player/controller';
 import { ProceduralCarbon, ProceduralSilica } from '../player/visual';
@@ -21,7 +22,7 @@ import { canBreak, canHarvest, HANDS, STAT_JA, type Power } from './game/interac
 const $ = (id: string) => document.getElementById(id)!;
 const params = new URLSearchParams(location.search);
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-if (isTouch) document.body.classList.add('touch');
+if (isTouch) document.body.classList.add('touch'); // device class (for performance choices only)
 if (params.has('auto')) setAutoAdvance(true);
 
 // ── renderer: no sky, no sun. Only the roots, fungi, lanterns and lamps give light ──
@@ -67,6 +68,7 @@ scene.add(silica.root);
 const fx = new BondFx();
 scene.add(fx.root);
 const cam = new ThirdPersonCamera(camera, world.colliders);
+cam.extraSolid = (x, y, z) => y > ceilAt(x, z) - 0.35 || y < heightAt(x, z);
 const blob = (() => {
   const cv = document.createElement('canvas');
   cv.width = cv.height = 64;
@@ -930,21 +932,79 @@ function updatePartner(dt: number) {
 
 // ── input wiring ──
 initKeyboardMouse(renderer.domElement);
-initTouch(renderer.domElement, $('stickBase'), $('stickKnob'));
+initTouch(renderer.domElement, $('stickBase'), $('stickKnob'), $('camBase'), $('camKnob'));
 bindButton($('bJump'), () => { if (ui.sayOpen) ui.advance(); else input.jump = true; });
-bindButton($('bAct'), () => { input.action = true; });
-bindButton($('bScan'), () => onScan());
-bindButton($('bForm'), () => onForm());
+bindAction($('bAct'), 'Interact');
+bindAction($('bScan'), 'Scan');
+bindAction($('bForm'), 'Form');
 let runToggle = false;
 bindButton($('bRun'), () => { runToggle = !runToggle; $('bRun').classList.toggle('on', runToggle); });
 $('bBagTop').onclick = () => openBag();
 $('bCodex').onclick = () => showCodex(S.k, S.notes);
 window.addEventListener('keydown', (e) => {
-  if (e.repeat) return;
-  if (e.code === 'KeyR' || e.code === 'KeyF') onScan();
-  if (e.code === 'KeyB' || e.code === 'KeyI') { if (S.k.create || Object.keys(S.inv).length) openBag(); }
-  if (e.code === 'Escape') ['scanWrap', 'bagWrap', 'codexWrap'].forEach((id) => ui.close(id));
+  if (e.code === 'Escape') ['scanWrap', 'bagWrap', 'codexWrap', 'settingsWrap'].forEach((id) => ui.close(id));
 });
+$('bSettings').onclick = () => openSettings();
+
+// ── which controls to show: follows the last device used ──
+const KEY_LABEL: Partial<Record<ActionName, string>> = { Interact: 'E', Scan: 'R', Form: 'Q', Bond: 'Q', Break: 'Q', Menu: 'B', Map: 'C', Jump: 'Space' };
+/** "E：" / "Ⓐ：" / "" in front of a prompt, depending on the device in use */
+function keyHint(a: ActionName) {
+  const d = getLastDevice();
+  if (d === 'gamepad') return `[${padLabel(a)}] `;
+  if (d === 'keyboard') return `${KEY_LABEL[a] ?? ''}：`;
+  return '';
+}
+function renderPadHelp() {
+  const row = (a: ActionName, t: string) => `${t}<b>${padLabel(a)}</b>`;
+  $('padHelp').innerHTML = [row('Interact', 'しらべる'), row('Jump', 'ジャンプ'), row('Bond', 'BOND'), row('Break', 'BREAK'), row('ToolNext', '道具'), row('Menu', 'メニュー'), row('Map', '図鑑')].join('<br>') + '<br><span style="font-size:11px;opacity:.7">左スティック 移動 ／ 右スティック カメラ</span>';
+}
+onDeviceChange((d) => {
+  document.body.classList.remove('input-touch', 'input-keyboard', 'input-gamepad');
+  document.body.classList.add(`input-${d}`);
+  if (d === 'gamepad') renderPadHelp();
+});
+onGamepad((id, on) => {
+  ui.toast(on ? `GAMEPAD CONNECTED<br><span style="font-size:11px">${id.slice(0, 40)}</span>` : 'GAMEPAD DISCONNECTED', on);
+  renderPadHelp();
+});
+
+// ── settings: camera sensitivity per device, invert Y (kept under this game's own key) ──
+const INPUT_KEY = 'element118.ch1.input';
+try { const raw = localStorage.getItem(INPUT_KEY); if (raw) applySettings(JSON.parse(raw)); } catch { /* defaults */ }
+function openSettings() {
+  const s = inputSettings;
+  const row = (k: 'mouse' | 'touch' | 'gamepad', t: string) => `<div class="setrow"><span>${t}</span><input type="range" min="0.3" max="2.5" step="0.1" value="${s[k]}" data-k="${k}"><b id="v_${k}">${s[k].toFixed(1)}</b></div>`;
+  $('settingsPanel').innerHTML = `<button class="small close" id="setX">とじる</button><h2>設定</h2><div class="kind">カメラ感度</div>
+    ${row('touch', 'タッチ（右スティック）')}${row('gamepad', 'ゲームパッド（右スティック）')}${row('mouse', 'マウス')}
+    <div class="setrow"><span>上下反転（Invert Y）</span><input type="checkbox" id="setInv" ${s.invertY ? 'checked' : ''}></div>
+    <div class="note">移動はいつもカメラの向きが基準（スティック上＝画面の奥）。</div>`;
+  $('setX').onclick = () => ui.close('settingsWrap');
+  const save = () => { try { localStorage.setItem(INPUT_KEY, JSON.stringify(inputSettings)); } catch { /* ignore */ } };
+  document.querySelectorAll<HTMLInputElement>('#settingsPanel input[type=range]').forEach((el) => (el.oninput = () => {
+    const k = el.dataset.k as 'mouse' | 'touch' | 'gamepad';
+    applySettings({ [k]: Number(el.value) });
+    $(`v_${k}`).textContent = Number(el.value).toFixed(1);
+    save();
+  }));
+  ($('setInv') as HTMLInputElement).onchange = (e) => { applySettings({ invertY: (e.target as HTMLInputElement).checked }); save(); };
+  ui.open('settingsWrap');
+}
+function cycleTool(dir: 1 | -1) {
+  if (!tools.length) { ui.toast('道具を持っていない'); return; }
+  const i = equipped ? tools.indexOf(equipped) : -1;
+  const n = (i + dir + tools.length + 1) % (tools.length + 1); // includes "bare hands"
+  equip(n === tools.length ? null : tools[n]);
+  ui.toast(equipped ? `持ちかえ：${equipped.name}` : '素手');
+}
+function onBondAction() {
+  if (S.form === 'sic') { ui.toast('もう つながっている'); return; }
+  onForm();
+}
+function onBreakAction() {
+  if (S.form !== 'sic') { ui.toast('いまは ひとり'); return; }
+  onForm();
+}
 for (const ev of ['gesturestart', 'gesturechange', 'dblclick']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
 window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -980,11 +1040,23 @@ function frame(now: number) {
   last = now;
   T += dt;
   fpsA.push(dt); if (fpsA.length > 30) fpsA.shift();
-  pollInput();
+  pollInput(dt);
   if (runToggle) input.run = true;
-  if (input.action) { if (ui.sayOpen) ui.advance(); else void onAction(); }
-  if (input.codex && !cutscene) showCodex(S.k, S.notes);
-  if (input.breakForm) onForm();
+  // actions (the same for touch, keyboard and gamepad)
+  if (input.action || (input.jump && ui.sayOpen)) { if (ui.sayOpen) { ui.advance(); input.jump = false; } else void onAction(); }
+  if (!cutscene && !ui.sayOpen) {
+    if (input.scan) onScan();
+    if (input.form) onForm();
+    if (input.bond) onBondAction();
+    if (input.breakForm) onBreakAction();
+    if (input.toolPrev) cycleTool(-1);
+    if (input.toolNext) cycleTool(1);
+    if (input.menu) { if (ui.busy()) ['scanWrap', 'bagWrap', 'codexWrap', 'settingsWrap'].forEach((id) => ui.close(id)); else if (S.k.create || Object.keys(S.inv).length) openBag(); else openSettings(); }
+    if (input.codex) { if (ui.busy()) ['scanWrap', 'bagWrap', 'codexWrap', 'settingsWrap'].forEach((id) => ui.close(id)); else if (S.k.scan) showCodex(S.k, S.notes); }
+    if (input.action && ui.busy() && !ui.sayOpen) ['scanWrap', 'codexWrap'].forEach((id) => ui.close(id));
+  }
+  // the player turns the camera (not during cut-scenes or menus)
+  if (!cutscene && !ui.busy()) cam.addLook(input.lookX, input.lookY);
 
   fx.update(dt);
   const { forward, right } = cam.basis();
@@ -1070,21 +1142,7 @@ function frame(now: number) {
     camPos.copy(camera.position);
     camLook.copy(player.pos).add(new THREE.Vector3(0, 1.2, 0));
   }
-  // never above the cave ceiling: walk the ray from Carbon to the camera and stop under the rock
-  if (!cine) {
-    const from = tmp.copy(player.pos).add(new THREE.Vector3(0, 1.3, 0));
-    const to = camera.position;
-    for (let i = 1; i <= 14; i++) {
-      const u = i / 14;
-      const x = from.x + (to.x - from.x) * u, y = from.y + (to.y - from.y) * u, z = from.z + (to.z - from.z) * u;
-      if (y > ceilAt(x, z) - 0.7 || y < heightAt(x, z) + 0.25) {
-        const k = Math.max(0.2, (i - 1) / 14);
-        camera.position.set(from.x + (to.x - from.x) * k, from.y + (to.y - from.y) * k, from.z + (to.z - from.z) * k);
-        camera.lookAt(from.x, from.y, from.z);
-        break;
-      }
-    }
-  }
+  // safety net (cut-scene cameras too): never above the cave ceiling
   const cy = ceilAt(camera.position.x, camera.position.z) - 0.6;
   if (camera.position.y > cy) camera.position.y = cy;
   if (shake > 0) { shake -= dt; camera.position.x += (Math.random() - 0.5) * shake * 0.6; camera.position.y += (Math.random() - 0.5) * shake * 0.6; }
@@ -1108,8 +1166,10 @@ function frame(now: number) {
   // prompts and buttons
   const t = !cutscene && !ui.busy() ? nearest(isActionable) : null;
   const scanT = S.k.scan && !cutscene ? nearest((k) => k.kind !== 'npc', 4) : null;
-  const pr = t ? `E：${actionLabel(t)}` : null;
-  ui.prompt(pr ? pr + (scanT && !isTouch ? '　　R：スキャン' : '') : scanT && !isTouch ? 'R：スキャン' : null);
+  const dev = getLastDevice();
+  const scanHint = scanT && dev !== 'touch' ? `${keyHint('Scan')}スキャン` : '';
+  const pr = t ? `${keyHint('Interact')}${actionLabel(t)}` : null;
+  ui.prompt(pr ? pr + (scanHint ? '　　' + scanHint : '') : scanHint || null);
   $('bAct').classList.toggle('hide', !t);
   $('bAct').textContent = t ? actionLabel(t).replace(/（.*$/, '') : 'E';
   $('bScan').classList.toggle('hide', !S.k.scan);
@@ -1163,6 +1223,6 @@ requestAnimationFrame(frame);
 // test hooks
 (window as unknown as { __ch1: unknown }).__ch1 = {
   get S() { return S; }, player, world, cam, silica, carbon, fx, ui, zones: ZONES,
-  begin, onAction, onScan, onForm, makeFromDesign, equip, get tools() { return tools; }, heightAt, ceilAt, zoneAt,
+  begin, onAction, onScan, onForm, makeFromDesign, equip, input, get tools() { return tools; }, heightAt, ceilAt, zoneAt,
   get cutscene() { return cutscene; }, level: (s: 'Si') => level(S.k, s), persist,
 };

@@ -356,7 +356,7 @@ function frame(now: number) {
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
   t += dt;
-  pollInput();
+  pollInput(dt);
   if (dbg.paused) { endFrame(); renderer.render(scene, camera); requestAnimationFrame(frame); return; }
   const codexOpen = $('codex').style.display === 'flex';
   if (input.codex) toggleCodex();
@@ -383,8 +383,8 @@ function frame(now: number) {
     prompt.style.display = isTouch ? 'none' : 'block';
     prompt.textContent = `E：${act.label.replace('\n', ' ')}`;
   } else prompt.style.display = 'none';
-  if (input.action && act && busy <= 0) act.run();
-  if (input.breakForm && form && busy <= 0) doBreak();
+  if ((input.action || input.bond) && act && busy <= 0) act.run();
+  if ((input.breakForm || input.form) && form && busy <= 0) doBreak();
 
   // player (sub-stepped); paused during the BOND/BREAK hit-stop
   fx.update(dt);
