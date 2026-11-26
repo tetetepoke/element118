@@ -1,7 +1,8 @@
 // Simple solid shapes standing on the terrain: vertical cylinders (trees, rocks, pillars) and
 // boxes rotated around Y (walls, steps, platforms). The player can stand on their tops,
 // step onto low ones, climb (mantle) onto mid-height ones, and is pushed out of the sides.
-import { heightAt } from './terrain';
+import { ground } from './ground';
+const heightAt = (x: number, z: number) => ground().heightAt(x, z);
 
 export interface Collider {
   id: string;

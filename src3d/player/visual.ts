@@ -83,12 +83,12 @@ function glowSprite(color: string, size: number) {
 }
 
 // ───────────────────────── a jointed chibi body ─────────────────────────
-interface BodyOpts {
+export interface BodyOpts {
   skin: number; hair: number; tunic: number; pants: number; boots: number; sleeve: number; glove: number;
   hairStyle: 'spiky' | 'swept';
 }
 
-interface Joint { root: THREE.Group; lower: THREE.Group }
+export interface Joint { root: THREE.Group; lower: THREE.Group }
 export interface Body {
   root: THREE.Group; // origin at the feet
   hips: THREE.Group;
@@ -100,7 +100,7 @@ export interface Body {
   tunicMat: THREE.MeshStandardMaterial;
 }
 
-function buildBody(o: BodyOpts): Body {
+export function buildBody(o: BodyOpts): Body {
   const root = new THREE.Group();
   const hips = new THREE.Group();
   hips.position.y = 0.74;
@@ -212,7 +212,7 @@ function buildBody(o: BodyOpts): Body {
 }
 
 // ───────────────────────── procedural animation ─────────────────────────
-class BodyAnimator {
+export class BodyAnimator {
   state: MoveState = 'Idle';
   speed = 0;
   info: MoveInfo = { phase: 'none', impact: 0, turn: 0 };
@@ -538,12 +538,28 @@ export class ProceduralCarbon implements CharacterVisual {
     return this.anim.play(name, name === 'hard_break' ? 0.55 : 0.8);
   }
 
+  private flashT = 0;
+  private hand: THREE.Group | null = null;
+  /** an empty group in the right glove: tools are parented here */
+  get rightHand() {
+    if (!this.hand) {
+      this.hand = new THREE.Group();
+      this.hand.position.set(0, -0.27, 0.02);
+      this.body.armR.lower.add(this.hand);
+    }
+    return this.hand;
+  }
+  /** the chest crystal flares for a moment (it reacts to the blue roots) */
+  flashCrystal(sec = 1.2) { this.flashT = sec; }
   update(dt: number) {
     this.t += dt;
+    this.flashT = Math.max(0, this.flashT - dt);
     this.anim.update(dt);
     this.cape.update(dt, this.anim.state, this.anim.speed, this.anim.info.phase, this.t);
-    (this.crystal.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.5 + Math.sin(this.t * 3) * 0.45;
-    this.glow.material.opacity = 0.55 + Math.sin(this.t * 3) * 0.25;
+    const boost = this.flashT > 0 ? Math.sin((this.flashT / 1.2) * Math.PI) * 5 : 0;
+    (this.crystal.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.5 + Math.sin(this.t * 3) * 0.45 + boost;
+    this.glow.material.opacity = Math.min(1, 0.55 + Math.sin(this.t * 3) * 0.25 + boost * 0.2);
+    this.glow.scale.setScalar(0.32 * (1 + boost * 0.5));
   }
 }
 

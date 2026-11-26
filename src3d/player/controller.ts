@@ -5,7 +5,8 @@
 import * as THREE from 'three';
 import type { InputState } from '../core/input';
 import type { ColliderWorld } from '../world/colliders';
-import { heightAt, WATER_Y, PLACES, HALF } from '../world/terrain';
+import { ground as getGround } from '../world/ground';
+const heightAt = (x: number, z: number) => getGround().heightAt(x, z);
 import type { CharacterVisual, MoveState, MoveInfo } from './visual';
 
 export const TUNING = {
@@ -33,7 +34,6 @@ export const TUNING = {
   maxSlope: 1.2, // rise per metre (≈50°)
   ledgeMax: 2.3,
   airLedgeMax: 1.5,
-  pondRadius: 17,
 };
 
 export class PlayerController {
@@ -57,7 +57,8 @@ export class PlayerController {
   private minFallVy = 0;
 
   constructor(public visual: CharacterVisual, private colliders: ColliderWorld) {
-    this.pos.set(PLACES.spawn.x, heightAt(PLACES.spawn.x, PLACES.spawn.y), PLACES.spawn.y);
+    const sp = getGround().spawn;
+    this.pos.set(sp.x, heightAt(sp.x, sp.z), sp.z);
   }
 
   /** Swap the model (e.g. the official GLB) without touching control. */
@@ -85,9 +86,13 @@ export class PlayerController {
     return this.speed;
   }
 
+  /** water surface under the player (updated each step) */
+  private waterY = -Infinity;
   private waterDepthAt(x: number, z: number) {
-    if (Math.hypot(x - PLACES.pond.x, z - PLACES.pond.y) > TUNING.pondRadius) return 0;
-    return WATER_Y - heightAt(x, z);
+    const w = getGround().waterAt(x, z);
+    this.waterY = w ?? -Infinity;
+    if (w === null) return 0;
+    return w - heightAt(x, z);
   }
 
   update(dt: number, inp: InputState, forward: THREE.Vector3, right: THREE.Vector3) {
@@ -119,7 +124,7 @@ export class PlayerController {
     const wish = new THREE.Vector3().addScaledVector(forward, my).addScaledVector(right, mx);
     const mag = Math.min(1, wish.length());
     const depth = this.waterDepthAt(this.pos.x, this.pos.z);
-    const swim = depth > 1.1 && this.pos.y < WATER_Y - 0.6;
+    const swim = depth > 1.1 && this.pos.y < this.waterY - 0.6;
     let top = (inp.run ? T.run : T.walk) * this.speedMul;
     if (swim) top = T.swim;
     else if (depth > 0.35 && this.onGround) top *= 0.7;
@@ -194,14 +199,15 @@ export class PlayerController {
     }
     const p2 = { x: this.pos.x, z: this.pos.z };
     this.colliders.pushOut(p2, this.pos.y, T.radius, T.height, T.step);
-    this.pos.x = THREE.MathUtils.clamp(p2.x, -HALF + 4, HALF - 4);
-    this.pos.z = THREE.MathUtils.clamp(p2.z, -HALF + 4, HALF - 4);
+    const half = getGround().half;
+    this.pos.x = THREE.MathUtils.clamp(p2.x, -half + 4, half - 4);
+    this.pos.z = THREE.MathUtils.clamp(p2.z, -half + 4, half - 4);
 
     // ── vertical ──
     const ground = this.colliders.groundAt(this.pos.x, this.pos.z, this.pos.y, T.step);
     if (swim) {
       this.vel.y = 0;
-      this.pos.y += (WATER_Y - 0.95 - this.pos.y) * (1 - Math.exp(-dt * 6));
+      this.pos.y += (this.waterY - 0.95 - this.pos.y) * (1 - Math.exp(-dt * 6));
       if (this.pos.y < ground) this.pos.y = ground;
       this.onGround = false;
       this.coyote = 0;

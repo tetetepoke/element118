@@ -10,6 +10,9 @@ import { load3d, save3d } from './core/storage';
 import { PlayerController } from './player/controller';
 import { ProceduralCarbon, ProceduralSilica } from './player/visual';
 import { BondFx } from './fx/bondFx';
+import { setGround } from './world/ground';
+import { meadowGround } from './world/terrain';
+setGround(meadowGround); // before anything touches the ground
 import { ABILITIES, ELEMENTS, FORMS, OBSTACLE_SOLUTIONS, PROPERTIES, recipeFor, type BondForm } from './chem/bondData';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;

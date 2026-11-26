@@ -226,3 +226,11 @@ export function buildTerrainMesh(segments = 200) {
   mesh.name = 'terrain';
   return mesh;
 }
+
+/** The meadow as a Ground for the shared movement code. */
+export const meadowGround = {
+  heightAt,
+  waterAt: (x: number, z: number) => (Math.hypot(x - PLACES.pond.x, z - PLACES.pond.y) < 17 ? WATER_Y : null),
+  half: HALF,
+  spawn: { x: PLACES.spawn.x, z: PLACES.spawn.y },
+};

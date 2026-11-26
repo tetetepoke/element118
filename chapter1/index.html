@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png?v=2" />
+    <link rel="icon" href="../icons/icon-192.png?v=2" />
+    <title>ELEMENT 118 — 第1章</title>
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; touch-action: none;
+        -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none;
+        font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif; color: #fff; }
+      #view { position: fixed; inset: 0; touch-action: none; }
+      #view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+      .hud { position: fixed; z-index: 2; pointer-events: none; }
+      .safeT { top: calc(env(safe-area-inset-top) + 10px); } .safeL { left: calc(env(safe-area-inset-left) + 12px); } .safeR { right: calc(env(safe-area-inset-right) + 12px); }
+      #mission { max-width: 46vw; background: linear-gradient(90deg, rgba(10, 18, 36, 0.8), rgba(10, 18, 36, 0)); padding: 6px 30px 6px 10px; border-left: 3px solid #5ab0ff; display: none; }
+      #mission .k { font-size: 11px; color: #8fc8ff; letter-spacing: 2px; } #mission .t { font-size: 15px; font-weight: bold; } #mission .s { font-size: 12px; color: #c8d8f0; }
+      #topR { display: flex; gap: 8px; align-items: center; }
+      #form { background: rgba(90, 74, 184, 0.85); border-radius: 10px; padding: 5px 10px; font-weight: bold; font-size: 13px; display: none; }
+      #toolTag { background: rgba(16, 21, 42, 0.75); border: 1px solid #8fa5c8; border-radius: 10px; padding: 5px 10px; font-size: 12px; display: none; }
+      button.small { pointer-events: auto; background: rgba(16, 21, 42, 0.75); color: #cfe8ff; border: 1px solid #8fa5c8; border-radius: 10px; padding: 6px 10px; font-size: 13px; font-family: inherit; }
+      button.small.hide { display: none; }
+      #prompt { left: 50%; bottom: calc(env(safe-area-inset-bottom) + 22px); transform: translateX(-50%); background: rgba(10, 16, 32, 0.82); padding: 7px 16px; border-radius: 12px; font-size: 15px; display: none; white-space: nowrap; }
+      #area { left: 50%; top: 18%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity 0.8s; }
+      #area .n { font-size: 34px; font-weight: 900; letter-spacing: 6px; text-shadow: 0 2px 12px #000; } #area .s { font-size: 14px; color: #b8d0f0; letter-spacing: 3px; margin-top: 4px; }
+      #area .line { width: 0; height: 1px; background: #8fc8ff; margin: 8px auto 0; transition: width 1.2s; } #area.on { opacity: 1; } #area.on .line { width: 240px; }
+      #toast { left: 50%; top: 34%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; }
+      #toast div { background: rgba(10, 16, 32, 0.85); border: 1px solid #5ab0ff; padding: 6px 14px; border-radius: 10px; font-size: 14px; animation: tin 0.25s ease-out; }
+      #toast div.big { border-color: #ffd84a; font-size: 17px; font-weight: bold; color: #ffe89a; }
+      @keyframes tin { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+      #say { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 18px); transform: translateX(-50%); width: min(760px, 88vw); background: rgba(6, 10, 22, 0.9); border: 1px solid #6a88b8;
+        border-radius: 14px; padding: 12px 18px 14px; display: none; z-index: 6; pointer-events: auto; }
+      #say .who { font-size: 13px; color: #8fc8ff; font-weight: bold; margin-bottom: 4px; } #say .txt { font-size: 18px; line-height: 1.6; min-height: 1.6em; }
+      #say .nx { position: absolute; right: 14px; bottom: 8px; font-size: 12px; color: #8fa5c8; animation: blink 1s infinite; }
+      @keyframes blink { 50% { opacity: 0.3; } }
+      #caption { left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 20px; letter-spacing: 3px; text-align: center; opacity: 0; transition: opacity 0.6s; z-index: 8; white-space: pre-line; }
+      #caption.on { opacity: 1; }
+      #fade { position: fixed; inset: 0; background: #000; z-index: 7; pointer-events: none; opacity: 1; transition: opacity 1s; }
+      #titleCard { position: fixed; inset: 0; z-index: 8; display: none; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
+      #titleCard .t { font-size: 64px; font-weight: 900; letter-spacing: 12px; color: #fff; text-shadow: 0 0 24px #3a8aff, 0 0 4px #9fd8ff; }
+      #titleCard .s { font-size: 14px; letter-spacing: 6px; color: #9fd8ff; margin-top: 10px; }
+      .panelWrap { position: fixed; inset: 0; z-index: 9; background: rgba(2, 4, 10, 0.82); display: none; align-items: center; justify-content: center; pointer-events: auto; }
+      .panel { width: min(980px, 94vw); max-height: 88vh; overflow: auto; background: #0c1226; border: 2px solid #5a88c8; border-radius: 16px; padding: 16px 20px; box-sizing: border-box; }
+      .panel h2 { margin: 0 0 4px; font-size: 21px; } .panel .kind { color: #8fc8ff; font-size: 13px; }
+      .panel .cols { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; } .panel .col { flex: 1 1 280px; background: #121a34; border-radius: 12px; padding: 10px 14px; }
+      .panel h3 { margin: 2px 0 8px; font-size: 15px; } .panel .real h3 { color: #fff; } .panel .fic h3 { color: #9fe0b8; }
+      .panel ul { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.6; }
+      .el { display: inline-block; min-width: 56px; padding: 4px 8px; margin: 3px; border-radius: 8px; background: #1e2a50; border: 1px solid #4a6aa8; text-align: center; font-weight: bold; }
+      .el.l0 { color: #6a7aa0; border-style: dashed; } .el.l1 { color: #ffd84a; } .el.l2 { color: #9fe0ff; background: #183a5a; }
+      .bar { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 3px 0; } .bar span { width: 110px; color: #c8d8f0; } .bar i { height: 8px; background: #5ab0ff; border-radius: 4px; display: block; }
+      .close { float: right; } .panel .note { font-size: 12px; color: #8fa5c8; margin-top: 8px; }
+      .slots { display: flex; gap: 10px; flex-wrap: wrap; } .slot { flex: 1 1 140px; background: #121a34; border: 2px dashed #4a6aa8; border-radius: 12px; padding: 8px; min-height: 64px; cursor: pointer; }
+      .slot.sel { border-color: #ffd84a; } .slot .k { font-size: 12px; color: #8fc8ff; } .slot .v { font-size: 15px; font-weight: bold; margin-top: 4px; }
+      .items { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; } .item { background: #1a2446; border: 1px solid #4a6aa8; border-radius: 10px; padding: 6px 10px; font-size: 14px; cursor: pointer; }
+      .item b { color: #ffd84a; margin-left: 4px; } .item:active { filter: brightness(1.4); }
+      .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 14px; margin-top: 10px; font-size: 14px; } .stats div b { color: #ffd84a; }
+      .bigbtn { pointer-events: auto; background: #2a5aa8; color: #fff; border: 0; border-radius: 12px; padding: 10px 18px; font-size: 16px; font-weight: bold; font-family: inherit; margin-top: 10px; }
+      .bigbtn:disabled { background: #3a4058; color: #8a90a8; }
+      #start { position: fixed; inset: 0; z-index: 12; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+      #start .t { font-size: 42px; letter-spacing: 10px; font-weight: 900; } #start .s { color: #8fa5c8; font-size: 13px; letter-spacing: 3px; }
+      #start button { pointer-events: auto; background: transparent; color: #cfe8ff; border: 1px solid #5a88c8; border-radius: 30px; padding: 12px 34px; font-size: 18px; font-family: inherit; letter-spacing: 3px; }
+      #start a { color: #6a7aa0; font-size: 12px; margin-top: 18px; }
+      .btn { position: fixed; z-index: 3; border-radius: 50%; display: none; align-items: center; justify-content: center; font-weight: bold; color: #fff; pointer-events: auto;
+        border: 3px solid rgba(255, 255, 255, 0.7); background: rgba(40, 60, 90, 0.55); touch-action: none; font-size: 13px; text-align: center; line-height: 1.1; }
+      .btn.down { filter: brightness(1.5); transform: scale(0.94); }
+      body.touch .btn { display: flex; } body.touch .btn.hide { display: none; } body.touch #help { display: none; }
+      #bJump { width: 88px; height: 88px; right: calc(env(safe-area-inset-right) + 24px); bottom: calc(env(safe-area-inset-bottom) + 24px); background: rgba(31, 106, 138, 0.6); }
+      #bAct { width: 74px; height: 74px; right: calc(env(safe-area-inset-right) + 124px); bottom: calc(env(safe-area-inset-bottom) + 34px); background: rgba(160, 120, 40, 0.6); }
+      #bScan { width: 62px; height: 62px; right: calc(env(safe-area-inset-right) + 36px); bottom: calc(env(safe-area-inset-bottom) + 124px); background: rgba(60, 140, 200, 0.6); font-size: 12px; }
+      #bForm { width: 62px; height: 62px; right: calc(env(safe-area-inset-right) + 112px); bottom: calc(env(safe-area-inset-bottom) + 122px); background: rgba(216, 88, 74, 0.65); font-size: 12px; }
+      #bRun { width: 58px; height: 58px; left: calc(env(safe-area-inset-left) + 22px); bottom: calc(env(safe-area-inset-bottom) + 170px); background: rgba(80, 80, 80, 0.5); font-size: 12px; }
+      #bRun.on { background: rgba(200, 140, 40, 0.7); }
+      #stickBase, #stickKnob { position: fixed; z-index: 3; display: none; pointer-events: none; left: 0; top: 0; border-radius: 50%; }
+      #stickBase { width: 140px; height: 140px; background: rgba(255, 255, 255, 0.12); border: 3px solid rgba(255, 255, 255, 0.35); }
+      #stickKnob { width: 60px; height: 60px; background: rgba(255, 255, 255, 0.45); }
+      #help { bottom: calc(env(safe-area-inset-bottom) + 8px); font-size: 11px; opacity: 0.7; text-align: right; line-height: 1.5; text-shadow: 0 1px 2px #000; }
+      #debug { left: calc(env(safe-area-inset-left) + 10px); bottom: calc(env(safe-area-inset-bottom) + 6px); font-size: 11px; opacity: 0.6; }
+      #rotate { display: none; position: fixed; inset: 0; z-index: 20; background: #000; align-items: center; justify-content: center; flex-direction: column; gap: 14px; font-size: 20px; }
+      @media (orientation: portrait) and (max-width: 900px) { body.touch #rotate { display: flex; } }
+      #fail { display: none; position: fixed; inset: 0; z-index: 21; background: #000; align-items: center; justify-content: center; text-align: center; padding: 20px; }
+      #end { position: fixed; inset: 0; z-index: 10; background: #000; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; text-align: center; pointer-events: auto; }
+      #end .c { font-size: 15px; letter-spacing: 4px; color: #8fc8ff; } #end .t { font-size: 30px; font-weight: 900; letter-spacing: 6px; } #end .q { font-size: 14px; color: #8fa5c8; line-height: 2; margin-top: 10px; }
+      #end .d { font-size: 13px; color: #c8d8f0; margin-top: 8px; } #end button { pointer-events: auto; }
+    </style>
+  </head>
+  <body>
+    <div id="view"></div>
+    <div id="mission" class="hud safeT safeL"><div class="k">MISSION</div><div class="t"></div><div class="s"></div></div>
+    <div id="topR" class="hud safeT safeR"><span id="toolTag"></span><span id="form">SiC FORM</span><button class="small hide" id="bBagTop">持ち物・つくる</button><button class="small hide" id="bCodex">図鑑</button></div>
+    <div id="area" class="hud"><div class="n"></div><div class="s"></div><div class="line"></div></div>
+    <div id="toast" class="hud"></div>
+    <div id="prompt" class="hud"></div>
+    <div id="say"><div class="who"></div><div class="txt"></div><div class="nx">▼ タップ / E</div></div>
+    <div id="caption" class="hud"></div>
+    <div id="titleCard"><div class="t">ELEMENT 118</div><div class="s">118 ELEMENTS. INFINITE CONNECTIONS.</div></div>
+    <div id="fade"></div>
+    <div id="help" class="hud safeR">WASD 移動 ／ Shift 走る ／ Space ジャンプ（段差に向かって押すと登る） ／ マウス カメラ<br />E 話す・拾う・使う ／ R スキャン ／ B 持ち物・つくる ／ Q BOND・BREAK ／ C 図鑑</div>
+    <div id="debug" class="hud"></div>
+    <div class="btn" id="bJump">JUMP</div>
+    <div class="btn hide" id="bAct">E</div>
+    <div class="btn hide" id="bScan">SCAN</div>
+    <div class="btn hide" id="bForm">BOND</div>
+    <div class="btn" id="bRun">RUN</div>
+    <div id="stickBase"></div><div id="stickKnob"></div>
+    <div class="panelWrap" id="scanWrap"><div class="panel" id="scanPanel"></div></div>
+    <div class="panelWrap" id="bagWrap"><div class="panel" id="bagPanel"></div></div>
+    <div class="panelWrap" id="codexWrap"><div class="panel" id="codexPanel"></div></div>
+    <div id="start"><div class="t">ELEMENT 118</div><div class="s">第1章　根は、上から来る</div><button id="bNew">はじめる</button><button id="bCont" style="display:none">つづきから</button><a href="../">2D版へ</a></div>
+    <div id="end"></div>
+    <div id="rotate"><div>📱↻</div><div>横にしてね</div></div>
+    <div id="fail"><div>この端末では3D表示（WebGL）が使えないようです。<br /><a href="../" style="color:#cfe8ff">2D版へもどる</a></div></div>
+    <script type="module" src="/src3d/ch1/main.ts"></script>
+  </body>
+</html>
