@@ -126,6 +126,22 @@
       #end { position: fixed; inset: 0; z-index: 10; background: #000; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; text-align: center; pointer-events: auto; }
       #end .c { font-size: 15px; letter-spacing: 4px; color: #8fc8ff; } #end .t { font-size: 30px; font-weight: 900; letter-spacing: 6px; } #end .q { font-size: 14px; color: #8fa5c8; line-height: 2; margin-top: 10px; }
       #end .d { font-size: 13px; color: #c8d8f0; margin-top: 8px; } #end button { pointer-events: auto; }
+      /* ── layout pass (art direction): keep the world wide, controls light and translucent ── */
+      #mission { background: linear-gradient(90deg, rgba(8, 12, 24, 0.55), rgba(8, 12, 24, 0)); border-left: 2px solid rgba(143, 200, 255, 0.8); padding: 4px 26px 4px 10px; }
+      #mission .t { font-size: 14px; } #mission .s { font-size: 11px; opacity: 0.85; }
+      .btn { background: rgba(14, 18, 30, 0.42) !important; border: 2px solid rgba(255, 255, 255, 0.55); box-shadow: 0 0 12px rgba(0, 0, 0, 0.35) inset; backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); letter-spacing: 1px; }
+      .btn.down { background: rgba(90, 150, 230, 0.5) !important; }
+      #bJump { width: 84px; height: 84px; right: calc(env(safe-area-inset-right) + 22px); bottom: calc(env(safe-area-inset-bottom) + 20px); font-size: 15px; }
+      #bAct { width: 72px; height: 72px; right: calc(env(safe-area-inset-right) + 118px); bottom: calc(env(safe-area-inset-bottom) + 14px); font-size: 13px; border-color: rgba(255, 216, 140, 0.75); }
+      #bForm { width: 64px; height: 64px; right: calc(env(safe-area-inset-right) + 30px); bottom: calc(env(safe-area-inset-bottom) + 118px); font-size: 12px; border-color: rgba(160, 210, 255, 0.8); }
+      #bScan { width: 58px; height: 58px; right: calc(env(safe-area-inset-right) + 112px); bottom: calc(env(safe-area-inset-bottom) + 102px); font-size: 11px; }
+      #bRun { background: rgba(14, 18, 30, 0.35) !important; }
+      #say { background: rgba(8, 12, 26, 0.72); border: 1px solid rgba(170, 200, 240, 0.35); border-radius: 16px; width: auto; transform: none;
+        left: calc(env(safe-area-inset-left) + 12vw); right: calc(env(safe-area-inset-right) + 12vw); padding: 18px 22px 14px; }
+      body.input-touch #say { left: calc(env(safe-area-inset-left) + 120px); right: calc(env(safe-area-inset-right) + 210px); }
+      #say .who { position: absolute; top: -13px; left: 18px; background: rgba(40, 70, 120, 0.95); color: #e8f2ff; border-radius: 12px; padding: 2px 14px; font-size: 13px; }
+      #say .txt { font-size: 19px; }
+      #prompt { background: rgba(8, 12, 26, 0.6); }
     </style>
   </head>
   <body>
@@ -142,7 +158,7 @@
     <div id="help" class="hud safeR">WASD 移動（カメラの向き基準） ／ Shift 走る ／ Space ジャンプ（段差に向かって押すと登る） ／ マウスドラッグ カメラ<br />E 話す・拾う・使う ／ R スキャン ／ B 持ち物・つくる ／ Q BOND・BREAK ／ Z・X 道具切替 ／ C 図鑑</div>
     <div id="debug" class="hud"></div>
     <div class="btn" id="bJump">JUMP</div>
-    <div class="btn hide" id="bAct">E</div>
+    <div class="btn hide" id="bAct">調べる</div>
     <div class="btn hide" id="bScan">SCAN</div>
     <div class="btn hide" id="bForm">BOND</div>
     <div class="btn" id="bRun">RUN</div>

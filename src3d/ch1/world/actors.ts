@@ -8,8 +8,8 @@ const std = (c: number, o: Partial<THREE.MeshStandardMaterialParameters> = {}) =
 export type NpcLook = 'worker' | 'worker2' | 'elder' | 'researcher' | 'resident' | 'resident2' | 'child' | 'vendor' | 'gatherer' | 'ferryman';
 
 const LOOKS: Record<NpcLook, BodyOpts & { scale?: number }> = {
-  worker: { skin: 0xc89a78, hair: 0x2a2220, tunic: 0x5a4a30, pants: 0x3a3428, boots: 0x2a2018, sleeve: 0x6a5634, glove: 0x8a6a30, hairStyle: 'spiky', scale: 1.25 },
-  worker2: { skin: 0xb88a68, hair: 0x5a4030, tunic: 0x3e4a5a, pants: 0x2e3438, boots: 0x2a2018, sleeve: 0x4a5868, glove: 0x8a6a30, hairStyle: 'swept', scale: 1.3 },
+  worker: { skin: 0xe0b08c, hair: 0x3a2a22, tunic: 0xe0702a, pants: 0x3a3e4a, boots: 0x4a3020, sleeve: 0x2e3038, glove: 0x8a6a40, hairStyle: 'spiky', scale: 1.15 },
+  worker2: { skin: 0xc8946e, hair: 0x5a4030, tunic: 0xd8642a, pants: 0x34383f, boots: 0x3a2818, sleeve: 0x2a2c34, glove: 0x8a6a40, hairStyle: 'swept', scale: 1.22 },
   elder: { skin: 0xd8b494, hair: 0xe8e4dc, tunic: 0x4a3a5a, pants: 0x3a3040, boots: 0x3a2a20, sleeve: 0x5a4a6a, glove: 0xd8b494, hairStyle: 'swept', scale: 1.1 },
   researcher: { skin: 0xf0d0b0, hair: 0x2a3a5a, tunic: 0xd8dce0, pants: 0x3a3e48, boots: 0x2a2a30, sleeve: 0xe0e4e8, glove: 0x6a8aa8, hairStyle: 'swept', scale: 1.15 },
   resident: { skin: 0xd8a888, hair: 0x6a3a2a, tunic: 0x6a4a3a, pants: 0x4a3a30, boots: 0x3a2a20, sleeve: 0x7a5a48, glove: 0xd8a888, hairStyle: 'spiky', scale: 1.15 },
@@ -29,21 +29,51 @@ export class Npc {
   facing = 0;
   constructor(public id: string, public look: NpcLook) {
     const L = LOOKS[look];
-    this.body = buildBody(L);
+    this.body = buildBody({ ...L, smooth: true, headScale: 1.1, capOnly: look === 'worker' || look === 'worker2' }); // rounded, soft-shaded placeholder people
     this.body.root.scale.setScalar(L.scale ?? 1);
     this.root.add(this.body.root);
     this.anim = new BodyAnimator(this.body);
     const head = this.body.head;
     if (look === 'worker' || look === 'worker2') {
-      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), std(0xe0a020));
-      helmet.position.y = 0.27;
+      // yellow hard hat with a brim and goggles, orange work clothes, a tool belt with pouches
+      const yellow = std(0xf0b820, { roughness: 0.35, metalness: 0.1 });
+      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.38, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2), yellow);
+      helmet.position.y = 0.06;
+      helmet.scale.set(1, 0.92, 1.04);
       head.add(helmet);
-      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), std(0xfff0c0, { emissive: 0xffd080, emissiveIntensity: 2 }));
-      lamp.position.set(0, 0.36, 0.22);
+      const brim = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.035, 8, 28), yellow);
+      brim.rotation.x = Math.PI / 2;
+      brim.position.y = 0.07;
+      head.add(brim);
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.6), yellow);
+      ridge.position.set(0, 0.42, 0);
+      head.add(ridge);
+      const gog = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.03, 8, 16), std(0x2a2a30, { metalness: 0.6, roughness: 0.3 }));
+      for (const sx of [-1, 1]) { const g2 = gog.clone(); g2.position.set(sx * 0.11, 0.17, 0.3); head.add(g2); }
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.075, 14), std(0x9ab8d0, { metalness: 0.4, roughness: 0.1 }));
+      for (const sx of [-1, 1]) { const l2 = lens.clone(); l2.position.set(sx * 0.11, 0.17, 0.315); head.add(l2); }
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), std(0xfff0c0, { emissive: 0xffd080, emissiveIntensity: 2 }));
+      lamp.position.set(0, 0.32, 0.33);
       head.add(lamp);
-      const vest = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.32, 10, 1, true), std(0xe06a20, { side: THREE.DoubleSide }));
-      vest.position.y = 0.3;
-      this.body.chest.add(vest);
+      const mark = new THREE.Mesh(new THREE.CircleGeometry(0.07, 3), std(0x2a2a30));
+      mark.position.set(0, 0.36, -0.2);
+      mark.rotation.y = Math.PI;
+      this.body.chest.add(mark);
+      const belt = new THREE.Mesh(new THREE.TorusGeometry(0.235, 0.04, 8, 24), std(0x6a4a28, { roughness: 0.6 }));
+      belt.rotation.x = Math.PI / 2;
+      belt.position.y = 0.08;
+      belt.scale.set(1, 0.8, 1);
+      this.body.torso.add(belt);
+      const pouchM = std(0x8a6a3a, { roughness: 0.7 });
+      for (const [x, z] of [[0.2, 0.08], [-0.2, 0.08], [0.12, -0.14]]) {
+        const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.13, 0.07), pouchM);
+        pouch.position.set(x, 0.0, z);
+        pouch.lookAt(0, 0, 0);
+        this.body.torso.add(pouch);
+      }
+      const wrench = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6), std(0x9aa0a8, { metalness: 0.8, roughness: 0.3 }));
+      wrench.position.set(-0.24, -0.04, 0.02);
+      this.body.torso.add(wrench);
     }
     if (look === 'elder') {
       const beard = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.3, 8), std(0xeeeae2));

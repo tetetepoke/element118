@@ -55,6 +55,18 @@ function taper(len: number, r0: number, r1: number) {
   return new THREE.LatheGeometry(out, 10);
 }
 
+/** A soft rounded hair clump: a smooth teardrop pointing up +y (no sharp facets). */
+function softClump(r: number, h: number) {
+  const pts: THREE.Vector2[] = [];
+  for (let i = 0; i <= 6; i++) {
+    const t = i / 6;
+    pts.push(new THREE.Vector2(r * Math.pow(Math.sin(Math.PI * t), 0.55) * (1 - t * 0.35) + 0.002, t * h)); // round, blunt tip
+  }
+  const g = new THREE.LatheGeometry(pts, 9);
+  g.translate(0, -h * 0.12, 0);
+  return g;
+}
+
 /** A cone bent along z (horns, hair clumps). */
 function bentCone(r: number, h: number, bend: number, seg = 6) {
   const g = new THREE.ConeGeometry(r, h, seg, 4);
@@ -86,6 +98,12 @@ function glowSprite(color: string, size: number) {
 export interface BodyOpts {
   skin: number; hair: number; tunic: number; pants: number; boots: number; sleeve: number; glove: number;
   hairStyle: 'spiky' | 'swept';
+  /** soft, rounded hair clumps with smooth shading (stylised anime look) instead of sharp cones */
+  smooth?: boolean;
+  /** only the hair cap (e.g. under a helmet) */
+  capOnly?: boolean;
+  /** bigger head for a chibi look (1 = default) */
+  headScale?: number;
 }
 
 export interface Joint { root: THREE.Group; lower: THREE.Group }
@@ -184,7 +202,8 @@ export function buildBody(o: BodyOpts): Body {
   neck.position.y = 0.72;
   const skull = mesh(new THREE.SphereGeometry(0.34, 22, 16), std(o.skin), head);
   skull.scale.set(1, 0.95, 0.96);
-  const hairM = std(o.hair, { roughness: 0.92, flatShading: true });
+  const hairM = std(o.hair, o.smooth ? { roughness: 0.6 } : { roughness: 0.92, flatShading: true });
+  if (o.headScale) head.scale.setScalar(o.headScale);
   const cap = mesh(new THREE.SphereGeometry(0.36, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.56), hairM, head);
   cap.position.set(0, 0.03, -0.03);
   cap.scale.set(1.02, 1, 1.04);
@@ -192,19 +211,19 @@ export function buildBody(o: BodyOpts): Body {
   const rows = o.hairStyle === 'spiky'
     ? [{ n: 9, el: 0.25, len: 0.32, r: 0.1, bend: -0.14 }, { n: 11, el: 0.65, len: 0.3, r: 0.1, bend: -0.1 }, { n: 7, el: 1.05, len: 0.22, r: 0.09, bend: -0.04 }]
     : [{ n: 8, el: 0.35, len: 0.36, r: 0.12, bend: -0.2 }, { n: 10, el: 0.75, len: 0.34, r: 0.13, bend: -0.16 }, { n: 6, el: 1.1, len: 0.3, r: 0.12, bend: -0.1 }];
-  rows.forEach((row, ri) => {
+  if (!o.capOnly) rows.forEach((row, ri) => {
     for (let i = 0; i < row.n; i++) {
       const az = (i / row.n) * Math.PI * 2 + ri * 0.3;
       if (Math.cos(az) > 0.55 && row.el > 0.5) continue; // keep the face clear
       const len = row.len * (0.8 + ((i * 37) % 10) / 25);
-      const s = mesh(bentCone(row.r, len, row.bend, 5), hairM, head);
+      const s = mesh(o.smooth ? softClump(row.r * 1.7, len * 0.68) : bentCone(row.r, len, row.bend, 5), hairM, head);
       const dir = new THREE.Vector3(Math.sin(az) * Math.sin(row.el + 0.4), Math.cos(row.el + 0.4), Math.cos(az) * Math.sin(row.el + 0.4));
       s.position.copy(dir.clone().multiplyScalar(0.27));
       s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.add(new THREE.Vector3(0, 0.35, -0.25)).normalize());
     }
   });
-  for (let i = 0; i < (o.hairStyle === 'spiky' ? 4 : 3); i++) {
-    const b = mesh(bentCone(0.07, 0.2, 0.08, 4), hairM, head);
+  for (let i = 0; i < (o.capOnly ? 0 : o.hairStyle === 'spiky' ? 4 : 3); i++) {
+    const b = mesh(o.smooth ? softClump(0.1, 0.16) : bentCone(0.07, 0.2, 0.08, 4), hairM, head);
     b.position.set(-0.15 + i * 0.1, 0.24, 0.24);
     b.rotation.set(1.9, 0, (i - 1.5) * 0.25);
   }
@@ -412,12 +431,12 @@ export class ProceduralCarbon implements CharacterVisual {
   private t = 0;
   private formT = 0; // 0 normal … 1 SiC
 
-  constructor() {
-    this.body = buildBody({ skin: 0xf2c9a0, hair: 0x4a2f2c, tunic: 0x2a201c, pants: 0x332620, boots: 0x6e4224, sleeve: 0x2e2420, glove: 0x5a3a26, hairStyle: 'spiky' });
+  constructor(opts: { smooth?: boolean } = {}) {
+    this.body = buildBody({ skin: 0xf2c9a0, hair: 0x4a2f2c, tunic: 0x2a201c, pants: 0x332620, boots: 0x6e4224, sleeve: 0x2e2420, glove: 0x5a3a26, hairStyle: 'spiky', smooth: opts.smooth, headScale: opts.smooth ? 1.12 : undefined });
     this.anim = new BodyAnimator(this.body);
     this.root.add(this.body.root);
     const b = this.body;
-    const lock = mesh(bentCone(0.07, 0.3, -0.12, 5), std(0xe8963e), b.head); // orange lock
+    const lock = mesh(opts.smooth ? softClump(0.08, 0.3) : bentCone(0.07, 0.3, -0.12, 5), std(0xe8963e, opts.smooth ? { roughness: 0.6 } : {}), b.head); // orange lock
     lock.position.set(0.16, 0.26, 0.14);
     lock.rotation.set(0.3, 0, -0.6);
     // the mask: face plate with a little fox-like chin, C and 6, curved horns with red tips
@@ -570,8 +589,8 @@ export class ProceduralSilica implements CharacterVisual {
   private cape: Cape;
   private body: Body;
   private t = 0;
-  constructor() {
-    const b = buildBody({ skin: 0xf6dcc4, hair: 0xe6e8f0, tunic: 0xf0f0f4, pants: 0x4a3f6a, boots: 0xe0b040, sleeve: 0xe8e8f0, glove: 0x4a3f6a, hairStyle: 'swept' });
+  constructor(opts: { smooth?: boolean } = {}) {
+    const b = buildBody({ skin: 0xf6dcc4, hair: 0xe6e8f0, tunic: 0xf0f0f4, pants: 0x4a3f6a, boots: 0xe0b040, sleeve: 0xe8e8f0, glove: 0x4a3f6a, hairStyle: 'swept', smooth: opts.smooth, headScale: opts.smooth ? 1.1 : undefined });
     this.body = b;
     this.anim = new BodyAnimator(b);
     this.root.add(b.root);

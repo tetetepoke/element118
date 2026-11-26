@@ -221,7 +221,8 @@ export const caveGround: Ground = {
 export function buildCaveMeshes(seg = 256) {
   const size = HALF * 2;
   const floorG = new THREE.PlaneGeometry(size, size, seg, seg).rotateX(-Math.PI / 2);
-  const ceilG = new THREE.PlaneGeometry(size, size, seg, seg).rotateX(Math.PI / 2);
+  const cseg = Math.round(seg * 0.6); // the ceiling is mostly in the dark: coarser is fine
+  const ceilG = new THREE.PlaneGeometry(size, size, cseg, cseg).rotateX(Math.PI / 2);
   const fp = floorG.attributes.position as THREE.BufferAttribute;
   const cp = ceilG.attributes.position as THREE.BufferAttribute;
   const fc = new Float32Array(fp.count * 3), cc = new Float32Array(cp.count * 3);
@@ -241,14 +242,15 @@ export function buildCaveMeshes(seg = 256) {
     if (zone?.id === 'crystal' && o > 0.5 && vnoise(x * 0.6, z * 0.6) > 0.78) c.lerp(new THREE.Color(0x7fb0e0), 0.5);
     if (zone?.id === 'mineral' && vnoise(x * 0.5 + 9, z * 0.5) > 0.75) c.lerp(new THREE.Color(0xa0603a), 0.5);
     fc.set([c.r, c.g, c.b], i * 3);
-    // ceiling: the same x/z grid (rotated the other way, so read its own x/z)
+    void ce;
+  }
+  for (let i = 0; i < cp.count; i++) {
     const cx = cp.getX(i), cz = cp.getZ(i);
     const cs = sample(cx, cz);
     cp.setY(i, cs.ceil);
     const z2 = zoneAt(cx, cz).zone;
     c.set(z2 ? z2.ceilTint : 0x1a1714).multiplyScalar(0.7 + 0.5 * vnoise(cx * 0.3, cz * 0.3));
     cc.set([c.r, c.g, c.b], i * 3);
-    void ce;
   }
   floorG.setAttribute('color', new THREE.BufferAttribute(fc, 3));
   ceilG.setAttribute('color', new THREE.BufferAttribute(cc, 3));

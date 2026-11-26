@@ -8,7 +8,9 @@ setGround(caveGround);
 import { buildWorld, type Thing } from './world/build';
 import { input, endFrame, initKeyboardMouse, initTouch, bindButton, bindAction, pollInput, onDeviceChange, onGamepad, getLastDevice, padLabel, applySettings, settings as inputSettings } from '../core/input';
 import type { ActionName } from '../core/inputConfig';
-import { ThirdPersonCamera } from '../core/camera';
+import { ThirdPersonCamera, CAMERA_TUNING } from '../core/camera';
+// chapter 1 framing: a little lower, over Carbon's shoulder, Carbon a bit below the centre, more world ahead
+Object.assign(CAMERA_TUNING, { distance: 4.2, pivotHeight: 1.2, lookAbove: 1.05, pitch: 0.1, minPitch: -0.35 });
 import { PlayerController } from '../player/controller';
 import { ProceduralCarbon, ProceduralSilica } from '../player/visual';
 import { BondFx } from '../fx/bondFx';
@@ -47,10 +49,42 @@ const FOG = { color: 0x060a14, near: 14, far: 110 };
 scene.fog = new THREE.Fog(FOG.color, FOG.near, FOG.far);
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 700);
 const hemi = new THREE.HemisphereLight(0x6a86b8, 0x241c14, 0.95);
+/** per-area air and fill light (visual only). The dump: warm haze, lamp-lit, not crushed to black */
+const ATMOS: Record<string, { fog: number; near: number; far: number; sky: number; ground: number; hemi: number; exp?: number }> = {
+  default: { fog: FOG.color, near: FOG.near, far: FOG.far, sky: 0x6a86b8, ground: 0x241c14, hemi: 0.95 },
+  dump: { fog: 0x241b20, near: 8, far: 72, sky: 0x9a8cc0, ground: 0x5a3418, hemi: 1.55, exp: 1.55 },
+  cave: { fog: 0x120e10, near: 5, far: 40, sky: 0x6a6a88, ground: 0x2a1a10, hemi: 1.0 },
+};
+let fogLocked = false; // the ending opens the fog itself
+const atmosFog = new THREE.Color(), atmosSky = new THREE.Color(), atmosGround = new THREE.Color();
 scene.add(hemi);
 
 const world = buildWorld();
 scene.add(world.root);
+// distance culling (visual only): objects past the fog are not drawn at all. Caves have no sky, so the
+// fog hides everything beyond it anyway; this keeps draw calls low on phones.
+const cullList: { o: THREE.Object3D; c: THREE.Vector3; r: number }[] = [];
+{
+  const box = new THREE.Box3(), sph = new THREE.Sphere();
+  world.root.updateMatrixWorld(true);
+  for (const o of world.root.children) {
+    if (o.name === 'floor' || o.name === 'ceiling') continue;
+    box.setFromObject(o);
+    if (box.isEmpty()) continue;
+    box.getBoundingSphere(sph);
+    if (sph.radius > 70) continue; // huge things (instanced spreads, long roots) stay; the GPU culls their parts
+    cullList.push({ o, c: sph.center.clone(), r: sph.radius });
+  }
+}
+let cullT = 0;
+function cullFar(dt: number) {
+  cullT -= dt;
+  if (cullT > 0) return;
+  cullT = 0.2;
+  const far = (scene.fog as THREE.Fog).far; // past the fog's far end everything is the fog colour anyway
+  const cp = camera.position;
+  for (const k of cullList) k.o.visible = !k.o.userData.gone && k.c.distanceTo(cp) - k.r < far;
+}
 
 // a small pool of point lights, moved each frame to the light spots nearest to the camera
 const POOL = isTouch ? 5 : 7;
@@ -60,10 +94,10 @@ const crystalLight = new THREE.PointLight(0x5ab8ff, 6, 7, 1.6);
 scene.add(crystalLight);
 
 // ── characters ──
-const carbon = new ProceduralCarbon();
+const carbon = new ProceduralCarbon({ smooth: true });
 scene.add(carbon.root);
 const player = new PlayerController(carbon, world.colliders);
-const silica = new ProceduralSilica();
+const silica = new ProceduralSilica({ smooth: true });
 silica.root.visible = false;
 scene.add(silica.root);
 const fx = new BondFx();
@@ -651,6 +685,7 @@ async function ending() {
     await ui.say('カーボン', '……開いた？');
     // look through the gap: a shaft going up, with faint lights far above (no sky)
     setCine(gx - 1.5, 63.4, 78, gx + 8, 150, 78);
+    fogLocked = true;
     scene.fog = new THREE.Fog(FOG.color, 30, 420);
     farOn = 0;
     await wait(3200);
@@ -672,6 +707,7 @@ async function ending() {
     note('「また降ってきた」の「また」とは？');
     await ui.fade(true, 2000);
     scene.fog = new THREE.Fog(FOG.color, FOG.near, FOG.far);
+    fogLocked = false;
     showEnd();
     persist();
   });
@@ -842,7 +878,7 @@ function breakThing(t: Thing, instant = false) {
     return;
   }
   if (t.obj) {
-    if (instant) t.obj.visible = false;
+    if (instant) { t.obj.visible = false; t.obj.userData.gone = true; }
     else shatter(t.obj);
   }
   if (instant) return;
@@ -1136,7 +1172,7 @@ function frame(now: number) {
     s.t = Math.min(1, s.t + dt * 2.5);
     s.m.scale.setScalar(Math.max(0.001, 1 - s.t));
     s.m.position.y -= dt * 2;
-    if (s.t >= 1) s.m.visible = false;
+    if (s.t >= 1) { s.m.visible = false; s.m.userData.gone = true; }
   }
   if (revealPulse >= 0) revealPulse += dt;
   if (gateGlow >= 0) {
@@ -1186,6 +1222,21 @@ function frame(now: number) {
   }
   crystalLight.position.copy(carbon.anchor(tmp));
   crystalLight.intensity = 3 + (S.form === 'sic' ? 2 : 0);
+  // area air: ease fog and fill light toward the current area's look
+  if (!fogLocked) {
+    const zid = zoneAt(camera.position.x, camera.position.z).zone?.id ?? '';
+    const A = ATMOS[zid] ?? ATMOS.default;
+    const k = 1 - Math.exp(-dt * 1.5);
+    const f = scene.fog as THREE.Fog;
+    f.color.lerp(atmosFog.set(A.fog), k);
+    f.near += (A.near - f.near) * k;
+    f.far += (A.far - f.far) * k;
+    scene.background = f.color;
+    hemi.color.lerp(atmosSky.set(A.sky), k);
+    hemi.groundColor.lerp(atmosGround.set(A.ground), k);
+    hemi.intensity += (A.hemi - hemi.intensity) * k;
+    renderer.toneMappingExposure += ((A.exp ?? 1.35) - renderer.toneMappingExposure) * k;
+  }
   // contact shadow
   const gy = world.colliders.topAt(player.pos.x, player.pos.z, 0);
   blob.position.set(player.pos.x, Math.min(gy, player.pos.y) + 0.04, player.pos.z);
@@ -1209,6 +1260,7 @@ function frame(now: number) {
 
   // autosave now and then
   if (flag('wake') && T % 15 < dt) persist();
+  cullFar(dt);
   renderer.render(scene, camera);
   endFrame();
   requestAnimationFrame(frame);
@@ -1253,5 +1305,6 @@ requestAnimationFrame(frame);
 (window as unknown as { __ch1: unknown }).__ch1 = {
   get S() { return S; }, player, world, cam, silica, carbon, fx, ui, zones: ZONES,
   begin, onAction, onScan, onForm, makeFromDesign, equip, input, viewerStats, gotIsOpen, dismissGot, gotItem, understood, openBag, get tools() { return tools; }, heightAt, ceilAt, zoneAt,
+  get renderInfo() { return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries }; },
   get cutscene() { return cutscene; }, level: (s: 'Si') => level(S.k, s), persist,
 };

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { ColliderWorld } from '../../world/colliders';
 import { buildCaveMeshes, heightAt, SPOTS, RIVER, CHASM, CORRIDORS, ZONES, vnoise } from './cavern';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { buildDumpProps } from './dumpProps';
 import { Npc, Crawler, Snail, Hakobi, FishSchool, glowMotes, type NpcLook } from './actors';
 
 export type ThingKind = 'pick' | 'node' | 'obstacle' | 'npc' | 'device' | 'scan' | 'plate';
@@ -84,7 +85,7 @@ export function buildWorld() {
   };
 
   // ── the blue roots (only pieces of them, running through the rock) ──
-  const rootMat = std(0x2a3448, { emissive: 0x123a8a, emissiveIntensity: 0.45, roughness: 0.55 });
+  const rootMat = std(0x26324a, { emissive: 0x0e2e70, emissiveIntensity: 0.3, roughness: 0.35, metalness: 0.15 });
   const veinMat = new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
   const roots: THREE.Mesh[] = [];
   const addRoot = (pts: [number, number, number][], r: number, id: string) => {
@@ -128,34 +129,12 @@ export function buildWorld() {
   addRoot([[68, 80, 50], [80, 64, 47], [96, 76, 45]], 1.4, 'facility');
   addRoot([[152, 60, 80], [150, 140, 78], [149, 300, 79]], 3, 'gate_shaft');
   updaters.push((t) => {
-    rootMat.emissiveIntensity = 0.5 + Math.sin(t * 0.6) * 0.1;
+    rootMat.emissiveIntensity = 0.3 + Math.sin(t * 0.6) * 0.07;
     veinMat.opacity = 0.55 + Math.sin(t * 1.8) * 0.2;
   });
 
   // ── 第七廃棄区 (the dump) ──
   const junkMats = [std(0x6a5040), std(0x5a5a60, { metalness: 0.4 }), std(0x7a6a4a), std(0x4a3a2a), std(0x8a4a30, { metalness: 0.3 }), std(0x6a6a5a)];
-  const junkGeos = [new THREE.BoxGeometry(1, 1, 1), new THREE.CylinderGeometry(0.5, 0.5, 1, 8), new THREE.DodecahedronGeometry(0.6, 0), new THREE.BoxGeometry(1.6, 0.3, 0.8)];
-  const dumpZ = ZONES.find((z) => z.id === 'dump')!;
-  {
-    // junk heaps: instanced (4 shapes, colour per piece) so the dump stays cheap on phones
-    const junkCols = [0x6a5040, 0x5a5a60, 0x7a6a4a, 0x4a3a2a, 0x8a4a30, 0x6a6a5a];
-    const inst = junkGeos.map((geo) => new THREE.InstancedMesh(geo, std(0xffffff, { metalness: 0.25 }), 80));
-    const counts = [0, 0, 0, 0];
-    const jm = new THREE.Matrix4(), jq = new THREE.Quaternion(), js = new THREE.Vector3(), jp = new THREE.Vector3(), jc = new THREE.Color();
-    for (let i = 0; i < 300; i++) {
-      const a = rnd() * Math.PI * 2, rr = Math.sqrt(rnd()) * 0.92;
-      const x = dumpZ.c.x + Math.cos(a) * dumpZ.rx * rr, z = dumpZ.c.y + Math.sin(a) * dumpZ.rz * rr;
-      if (Math.hypot(x - SPOTS.wake.x, z - SPOTS.wake.y) < 5 || Math.hypot(x - SPOTS.pit.x, z - SPOTS.pit.y) < 7 || (Math.abs(x - 20) < 5 && z < 101)) continue;
-      const k = i % 4;
-      if (counts[k] >= 80) continue;
-      const sc = 0.5 + rnd() * 1.6;
-      jm.compose(jp.set(x, g(x, z) + sc * 0.25, z), jq.setFromEuler(new THREE.Euler(rnd() * 3, rnd() * 3, rnd() * 3)), js.set(sc, sc * (0.5 + rnd()), sc));
-      inst[k].setMatrixAt(counts[k], jm);
-      inst[k].setColorAt(counts[k], jc.set(junkCols[i % junkCols.length]));
-      counts[k]++;
-    }
-    inst.forEach((m, k) => { m.count = counts[k]; root.add(m); });
-  }
   // the collector machine (a crane on rails)
   const crane = new THREE.Group();
   const yellow = std(0xc89a20, { metalness: 0.3 });
@@ -265,6 +244,10 @@ export function buildWorld() {
   };
   oreVein('cave_ore', -35, 125);
 
+  // the dump's dressing: recognisable junk, ground detail, fake lights (visual only; a few simple colliders)
+  const dumpProps = buildDumpProps({ root, colliders, lights, g, rnd });
+  updaters.push((t) => dumpProps.update(t));
+
   // ── 地下都市 (the city) ──
   const houseM = [std(0x8a7a66), std(0x7a6a5a), std(0x6a6458), std(0x9a8a72)];
   const winM = std(0xffd890, { emissive: 0xffa040, emissiveIntensity: 1.6 });
@@ -357,7 +340,7 @@ export function buildWorld() {
   const plants = new THREE.InstancedMesh(plantG, plantM, 520);
   let pk = 0;
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
-  for (const [cx, cz, rr] of plantSpots) for (let i = 0; i < 70 && pk < 520; i++) {
+  for (const [cx, cz, rr] of plantSpots) for (let i = 0; i < (cz > 90 ? 6 : 70) && pk < 520; i++) {
     const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * rr;
     const x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d;
     const s = 0.6 + rnd() * 1.2;
