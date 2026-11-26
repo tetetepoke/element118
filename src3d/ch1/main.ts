@@ -12,9 +12,10 @@ import { ThirdPersonCamera } from '../core/camera';
 import { PlayerController } from '../player/controller';
 import { ProceduralCarbon, ProceduralSilica } from '../player/visual';
 import { BondFx } from '../fx/bondFx';
-import { ui, wait, showScan, showBag, showCodex, setAutoAdvance, autoAdvance } from './ui';
+import { ui, wait, showScan, showBag, showCodex, setAutoAdvance, autoAdvance, showGot, dismissGot, gotIsOpen } from './ui';
+import { viewerStats } from './itemViewer';
 import { sfx, startAudio } from './audio';
-import { ITEMS, MATERIALS } from './game/materials';
+import { ITEMS, MATERIALS, ELEMENTS, type ElementSymbol } from './game/materials';
 import { newKnowledge, unlockScan, noteScan, level, type KnowledgeState } from './game/knowledge';
 import { makeTool, toolMesh, type Tool, type ToolDesign } from './game/craft';
 import { canBreak, canHarvest, HANDS, STAT_JA, type Power } from './game/interact';
@@ -99,9 +100,12 @@ interface Save {
   notes: string[];
   pos?: [number, number, number];
   hakobiSide: 'south' | 'north';
+  /** items / elements already shown with the big card (added later: missing in old saves) */
+  seen?: string[];
+  seenEl?: string[];
 }
 const SAVE_KEY = 'element118.ch1.save';
-const fresh = (): Save => ({ v: 1, flags: {}, inv: {}, tools: [], equipped: null, k: newKnowledge(), form: 'normal', partner: 'none', broken: [], notes: [], hakobiSide: 'south' });
+const fresh = (): Save => ({ v: 1, flags: {}, inv: {}, tools: [], equipped: null, k: newKnowledge(), form: 'normal', partner: 'none', broken: [], notes: [], hakobiSide: 'south', seen: [], seenEl: [] });
 let S: Save = fresh();
 let tools: Tool[] = [];
 function loadSave(): Save | null {
@@ -129,6 +133,29 @@ function setFlag(f: string) {
 }
 function note(n: string) {
   if (!S.notes.includes(n)) S.notes.push(n);
+}
+/** old saves have no first-find record: count what they already own / understand as seen */
+function upgradeSave(s: Save) {
+  if (!s.seen) s.seen = Object.keys(s.inv).filter((id) => (s.inv[id] ?? 0) > 0);
+  if (!s.seenEl) s.seenEl = (Object.keys(s.k.el) as ElementSymbol[]).filter((e) => (s.k.el[e] ?? 0) >= 2);
+}
+/** first time: big 3D card. after that: a small notice */
+async function gotItem(id: string, n = 1) {
+  upgradeSave(S);
+  if (S.seen!.includes(id)) { ui.toast(`＋ ${ITEMS[id].nameJa} ×${n}`); return; }
+  S.seen!.push(id);
+  persist();
+  await showGot({ subject: { kind: 'item', id }, tag: 'NEW', title: ITEMS[id].nameJa, count: n });
+}
+/** an element is understood (never "picked up") */
+async function understood(sym: ElementSymbol, text?: string) {
+  upgradeSave(S);
+  if (S.seenEl!.includes(sym)) return;
+  S.seenEl!.push(sym);
+  persist();
+  const e = ELEMENTS[sym];
+  sfx.chime(true);
+  await showGot({ subject: { kind: 'element', symbol: sym }, tag: 'UNDERSTOOD', title: sym, line2: String(e.z), line3: `${e.en}<br>${e.nameJa}`, note: text });
 }
 
 // ── tools in the hand ──
@@ -414,7 +441,7 @@ async function researcherTalk() {
       await ui.say('研究者', '……すごい。あたしたちには、機械を使っても少ししか見えないのに。');
       unlockScan(k);
       ui.toast('MATERIAL SCAN 解放　（R / SCAN ボタン）', true, 4000);
-      sfx.chime(true);
+      await understood('C', 'じぶん自身の元素。');
       await ui.say('研究者', 'いろんな物を見てごらん。石、木、金属、水……。3つ見たら、また話そう。');
       persist();
       updateMission();
@@ -512,7 +539,7 @@ async function meetSilica() {
     await ui.say('カーボン', 'なんで、こんなことができるんだろう。');
     S.k.el.Si = 2;
     S.k.bond = true;
-    ui.toast('UNDERSTOOD　Si（ケイ素）', true, 3400);
+    await understood('Si', 'シリカとつながって、わかった。');
     ui.toast('BOND：Si ＋ C → SiC（炭化ケイ素）', true, 3400);
     note('なぜカーボンは BOND できるのか');
     note('胸の結晶は、なぜ根と同じ色なのか');
@@ -711,7 +738,7 @@ async function onAction() {
     addItem(give);
     carbon.playAction('hard_break');
     sfx.pick();
-    ui.toast(`＋ ${ITEMS[give].nameJa}`);
+    void gotItem(give);
     if (MATERIALS[t.mat].harvest?.tier === 2) useTool();
     if (Object.values(S.inv).filter((n) => n > 0).length >= 2 && S.k.harvest) setFlag('got2');
     persist();
@@ -756,7 +783,7 @@ function onScan() {
   carbon.flashCrystal(0.6);
   showScan(S.k, t.mat, t.label);
   const before = S.k.scanned.length;
-  for (const u of noteScan(S.k, t.mat)) { ui.toast(`UNDERSTOOD　${u.el}`, true, 4200); ui.toast(u.text, false, 5200); sfx.chime(true); }
+  for (const u of noteScan(S.k, t.mat)) void understood(u.el, u.text);
   if (S.k.scanned.length !== before && S.k.scanned.length >= 3) setFlag('scan3');
   if (t.mat === 'blue_root') { carbon.flashCrystal(1.2); note('青い根の中を、何かが流れている'); }
   if (t.id === 'mural') note('壁画の、落ちてくる人。胸に光るもの');
@@ -1043,6 +1070,7 @@ function frame(now: number) {
   pollInput(dt);
   if (runToggle) input.run = true;
   // actions (the same for touch, keyboard and gamepad)
+  if (gotIsOpen() && (input.action || input.jump)) { dismissGot(); input.action = input.jump = false; }
   if (input.action || (input.jump && ui.sayOpen)) { if (ui.sayOpen) { ui.advance(); input.jump = false; } else void onAction(); }
   if (!cutscene && !ui.sayOpen) {
     if (input.scan) onScan();
@@ -1193,6 +1221,7 @@ async function begin(cont: boolean) {
   const sv = loadSave();
   if (cont && sv) {
     S = sv;
+    upgradeSave(S);
     applySave();
     sfx.ambience(true);
     await ui.fade(false, 1200);
@@ -1223,6 +1252,6 @@ requestAnimationFrame(frame);
 // test hooks
 (window as unknown as { __ch1: unknown }).__ch1 = {
   get S() { return S; }, player, world, cam, silica, carbon, fx, ui, zones: ZONES,
-  begin, onAction, onScan, onForm, makeFromDesign, equip, input, get tools() { return tools; }, heightAt, ceilAt, zoneAt,
+  begin, onAction, onScan, onForm, makeFromDesign, equip, input, viewerStats, gotIsOpen, dismissGot, gotItem, understood, openBag, get tools() { return tools; }, heightAt, ceilAt, zoneAt,
   get cutscene() { return cutscene; }, level: (s: 'Si') => level(S.k, s), persist,
 };

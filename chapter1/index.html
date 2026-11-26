@@ -60,6 +60,34 @@
       .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 14px; margin-top: 10px; font-size: 14px; } .stats div b { color: #ffd84a; }
       .bigbtn { pointer-events: auto; background: #2a5aa8; color: #fff; border: 0; border-radius: 12px; padding: 10px 18px; font-size: 16px; font-weight: bold; font-family: inherit; margin-top: 10px; }
       .bigbtn:disabled { background: #3a4058; color: #8a90a8; }
+      /* got-it card: the game stays visible behind, only a little darker */
+      #gotWrap { background: rgba(0, 0, 0, 0.42); z-index: 11; }
+      .got { width: min(360px, 86vw); max-height: 92vh; overflow: hidden; text-align: center; background: rgba(10, 16, 34, 0.86); border: 2px solid #5a88c8; border-radius: 20px; padding: 10px 16px 14px; box-sizing: border-box; }
+      .got.el { border-color: #9fd8ff; box-shadow: 0 0 40px rgba(90, 170, 255, 0.45); }
+      .got .gv { width: min(220px, 34vh); height: min(220px, 34vh); margin: 0 auto; }
+      .got .tag { display: inline-block; margin-top: 2px; padding: 2px 12px; border-radius: 10px; background: #ffd84a; color: #20180a; font-weight: 900; font-size: 13px; letter-spacing: 3px; }
+      .got.el .tag { background: #9fd8ff; color: #0a1830; }
+      .got .tt { font-size: 24px; font-weight: 900; letter-spacing: 3px; margin-top: 6px; }
+      .got .l2 { font-size: 20px; font-weight: bold; color: #cfe8ff; } .got .l3 { font-size: 15px; color: #c8d8f0; } .got .cnt { font-size: 16px; color: #ffd84a; margin-top: 2px; }
+      .got .bigbtn { margin-top: 8px; min-width: 120px; min-height: 44px; }
+      /* short landscape phones: model on the left, words on the right, so the model can be big */
+      @media (max-height: 520px) {
+        .got { width: min(560px, 92vw); display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 12px; text-align: center; }
+        .got .gv { width: min(240px, 62vh); height: min(240px, 62vh); grid-row: 1 / span 7; }
+      }
+      /* bag: thumbnails + preview */
+      .bagTop { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+      .grid { flex: 1 1 300px; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin-top: 8px; }
+      .card { background: #1a2446; border: 2px solid #33477a; border-radius: 12px; padding: 6px; text-align: center; cursor: pointer; }
+      .card.sel { border-color: #ffd84a; } .card .th { width: 64px; height: 64px; margin: 0 auto; display: flex; align-items: center; justify-content: center; color: #8fa5c8; font-size: 18px; }
+      .card .th img { width: 64px; height: 64px; } .card .nm { font-size: 12px; margin-top: 2px; } .card .n { font-size: 13px; color: #ffd84a; font-weight: bold; }
+      .preview { flex: 0 1 230px; background: #121a34; border-radius: 14px; padding: 8px; text-align: center; margin-top: 8px; }
+      .preview .pv, .eldetail .pv { width: 200px; height: 200px; margin: 0 auto; touch-action: none; }
+      .preview .pn, .eldetail .pn { font-weight: bold; font-size: 16px; }
+      .eldetail { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; background: #121a34; border-radius: 14px; padding: 10px; margin-top: 10px; }
+      .eldetail .info { flex: 1 1 260px; font-size: 14px; line-height: 1.6; } .eldetail .sym { font-size: 40px; font-weight: 900; } .eldetail .sym span { font-size: 18px; margin-left: 8px; color: #8fc8ff; }
+      .eldetail .fic h3 { color: #9fe0b8; } .elrow { cursor: pointer; }
+      .panel .close { min-width: 64px; min-height: 36px; }
       #start { position: fixed; inset: 0; z-index: 12; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
       #start .t { font-size: 42px; letter-spacing: 10px; font-weight: 900; } #start .s { color: #8fa5c8; font-size: 13px; letter-spacing: 3px; }
       #start button { pointer-events: auto; background: transparent; color: #cfe8ff; border: 1px solid #5a88c8; border-radius: 30px; padding: 12px 34px; font-size: 18px; font-family: inherit; letter-spacing: 3px; }
@@ -122,6 +150,7 @@
     <div class="panelWrap" id="scanWrap"><div class="panel" id="scanPanel"></div></div>
     <div class="panelWrap" id="bagWrap"><div class="panel" id="bagPanel"></div></div>
     <div class="panelWrap" id="codexWrap"><div class="panel" id="codexPanel"></div></div>
+    <div class="panelWrap" id="gotWrap"><div id="gotPanel" class="got"></div></div>
     <div class="panelWrap" id="settingsWrap"><div class="panel" id="settingsPanel"></div></div>
     <div id="start"><div class="t">ELEMENT 118</div><div class="s">第1章　根は、上から来る</div><button id="bNew">はじめる</button><button id="bCont" style="display:none">つづきから</button><a href="../">2D版へ</a></div>
     <div id="end"></div>

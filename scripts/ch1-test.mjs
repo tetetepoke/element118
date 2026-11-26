@@ -23,7 +23,7 @@ await page.click('#bNew');
 
 const G = (fn, a) => page.evaluate(async (x) => await (new Function('G', 'a', `return (async () => (${x.fn})(G, a))()`))(window.__ch1, x.a), { fn: fn.toString(), a });
 const waitFor = async (fn, ms = 30000, a) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await G(fn, a)) return true; await page.waitForTimeout(200); } return false; };
-const idle = () => waitFor((G) => !G.cutscene && !G.fx.active && !G.ui.sayOpen);
+const idle = () => waitFor((G) => !G.cutscene && !G.fx.active && !G.ui.sayOpen && !G.gotIsOpen());
 const closePanels = () => page.evaluate(() => ['scanWrap', 'bagWrap', 'codexWrap'].forEach((id) => (document.getElementById(id).style.display = 'none')));
 
 // walk through points with the real controller; jumps now and then (to mantle ledges)
@@ -195,8 +195,8 @@ await idle();
 
 console.log('return visits: places that were closed before');
 // understand Fe by scanning the dump's scrap metal and rusty plate, then the ore can be taken
-await tp(25, 106); await G((G) => G.onScan()); await closePanels();
-await tp(33, 106.5); await G((G) => G.onScan()); await closePanels();
+await tp(25, 106); await G((G) => G.onScan()); await closePanels(); await idle();
+await tp(33, 106.5); await G((G) => G.onScan()); await closePanels(); await idle();
 check((await G((G) => G.S.k.el.Fe)) === 2, 'back in the dump: scrap metal + rusty plate → Fe understood');
 await tp(-8, 124.5);
 const cv = await walk([[-11.5, 125]]);

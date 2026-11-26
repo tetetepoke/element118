@@ -10,19 +10,34 @@ export interface ElementInfo {
   symbol: ElementSymbol;
   z: number;
   nameJa: string;
-  fact: string;
+  en: string; // shown in capitals on the UNDERSTOOD card
+  fact: string; // real science
+  ability?: string; // what it does in the game (fiction)
+  color: number; // colour of its game image (not a real colour of the element)
+  visual?: Visual;
+}
+
+/**
+ * How something is shown. Tried in this order: model (GLB) → icon (PNG) → proc (code-built 3D) → text only.
+ * e.g. later: { model: '/element118/assets/items/quartz.glb' } — UI and game logic stay the same.
+ */
+export interface Visual {
+  model?: string; // GLB / glTF url
+  icon?: string; // PNG url (public/assets/items/…)
+  proc?: 'quartz' | 'ore' | 'crystal' | 'stick' | 'pipe' | 'stone' | 'heavy' | 'blade' | 'fiber' | 'stem';
+  important?: boolean; // gets the big 3D card and 3D preview
 }
 
 export const ELEMENTS: Record<ElementSymbol, ElementInfo> = {
-  H: { symbol: 'H', z: 1, nameJa: '水素', fact: 'いちばん軽い元素。水（H₂O）や、生き物の体をつくる物質の多くに入っている。' },
-  C: { symbol: 'C', z: 6, nameJa: '炭素', fact: '原子1つが最大4本の結合をつくれる。鎖・輪・網などいろいろな形になり、生き物の体の骨組みになる。' },
-  N: { symbol: 'N', z: 7, nameJa: '窒素', fact: '空気の約78％。たんぱく質など、生き物の体にも入っている。' },
-  O: { symbol: 'O', z: 8, nameJa: '酸素', fact: '地球の岩石の重さのおよそ半分は酸素。水にも、石英にも、さびにも入っている。' },
-  Si: { symbol: 'Si', z: 14, nameJa: 'ケイ素', fact: '地球の岩石に酸素の次に多い元素。酸素と結びついて石英（SiO₂）や砂、多くの岩をつくる。' },
-  Fe: { symbol: 'Fe', z: 26, nameJa: '鉄', fact: '鉄鉱石（赤鉄鉱 Fe₂O₃ など）から取り出す金属。少しの炭素をまぜると鋼（はがね）になる。' },
-  Ca: { symbol: 'Ca', z: 20, nameJa: 'カルシウム', fact: '石灰岩や骨・貝がらに入っている。' },
-  Al: { symbol: 'Al', z: 13, nameJa: 'アルミニウム', fact: '地殻に3番目に多い元素。粘土や長石などの鉱物に入っている。' },
-  Cu: { symbol: 'Cu', z: 29, nameJa: '銅', fact: '電気と熱をよく通す赤い金属。' },
+  H: { symbol: 'H', z: 1, nameJa: '水素', en: 'HYDROGEN', color: 0x9fe0ff, fact: 'いちばん軽い元素。水（H₂O）や、生き物の体をつくる物質の多くに入っている。' },
+  C: { symbol: 'C', z: 6, nameJa: '炭素', en: 'CARBON', color: 0x6a7a9a, ability: 'BOND：ほかの元素とつながって、すがたと力が変わる（ゲームの能力）', fact: '原子1つが最大4本の結合をつくれる。鎖・輪・網などいろいろな形になり、生き物の体の骨組みになる。' },
+  N: { symbol: 'N', z: 7, nameJa: '窒素', en: 'NITROGEN', color: 0x7a9aff, fact: '空気の約78％。たんぱく質など、生き物の体にも入っている。' },
+  O: { symbol: 'O', z: 8, nameJa: '酸素', en: 'OXYGEN', color: 0xff8a8a, fact: '地球の岩石の重さのおよそ半分は酸素。水にも、石英にも、さびにも入っている。' },
+  Si: { symbol: 'Si', z: 14, nameJa: 'ケイ素', en: 'SILICON', color: 0xb8a8ff, ability: 'C とつながって SiC FORM（HARD BREAK）になる（ゲームの能力）', fact: '地球の岩石に酸素の次に多い元素。酸素と結びついて石英（SiO₂）や砂、多くの岩をつくる。' },
+  Fe: { symbol: 'Fe', z: 26, nameJa: '鉄', en: 'IRON', color: 0xd08a5a, fact: '鉄鉱石（赤鉄鉱 Fe₂O₃ など）から取り出す金属。少しの炭素をまぜると鋼（はがね）になる。' },
+  Ca: { symbol: 'Ca', z: 20, nameJa: 'カルシウム', en: 'CALCIUM', color: 0xe8e0c8, fact: '石灰岩や骨・貝がらに入っている。' },
+  Al: { symbol: 'Al', z: 13, nameJa: 'アルミニウム', en: 'ALUMINIUM', color: 0xc8d0d8, fact: '地殻に3番目に多い元素。粘土や長石などの鉱物に入っている。' },
+  Cu: { symbol: 'Cu', z: 29, nameJa: '銅', en: 'COPPER', color: 0xe0905a, fact: '電気と熱をよく通す赤い金属。' },
 };
 
 /** what kind of substance it is (real chemistry categories) */
@@ -183,15 +198,16 @@ export interface ItemDef {
   blunt: number; // 0..1 how much a flat striking face it has
   binding?: boolean; // can tie parts together
   color: number;
+  visual?: Visual;
 }
 export const ITEMS: Record<string, ItemDef> = {
-  stick: { id: 'stick', nameJa: '木の棒', mat: 'wood', length: 1.0, mass: 0.5, edge: 0, point: 0.15, blunt: 0.2, color: 0x8a6a44 },
-  pipe: { id: 'pipe', nameJa: '鉄パイプ', mat: 'scrap_metal', length: 1.2, mass: 1.6, edge: 0, point: 0, blunt: 0.4, color: 0x7a7e84 },
-  sharp_stone: { id: 'sharp_stone', nameJa: 'とがった石', mat: 'stone', length: 0.16, mass: 0.35, edge: 0.4, point: 0.85, blunt: 0.1, color: 0x8c8580 },
-  heavy_stone: { id: 'heavy_stone', nameJa: '重い石', mat: 'stone', length: 0.26, mass: 2.0, edge: 0, point: 0, blunt: 1, color: 0x6e6862 },
-  blade: { id: 'blade', nameJa: '金属の刃', mat: 'scrap_metal', length: 0.32, mass: 0.5, edge: 0.9, point: 0.3, blunt: 0, color: 0xa8acb2 },
-  fiber: { id: 'fiber', nameJa: '菌糸のひも', mat: 'fiber', length: 0.5, mass: 0.05, edge: 0, point: 0, blunt: 0, binding: true, color: 0xd8c8e8 },
-  quartz: { id: 'quartz', nameJa: '石英のかけら', mat: 'quartz', length: 0.22, mass: 0.35, edge: 1, point: 0.9, blunt: 0, color: 0xe8f0ff },
-  ore: { id: 'ore', nameJa: '鉄鉱石', mat: 'hematite', length: 0.3, mass: 3.2, edge: 0, point: 0, blunt: 1, color: 0x8a3a2a },
-  fungus_stem: { id: 'fungus_stem', nameJa: '菌の茎', mat: 'fungus', length: 1.1, mass: 0.4, edge: 0, point: 0, blunt: 0.2, color: 0xb8a8d8 },
+  stick: { id: 'stick', nameJa: '木の棒', mat: 'wood', length: 1.0, mass: 0.5, edge: 0, point: 0.15, blunt: 0.2, color: 0x8a6a44, visual: { proc: 'stick' } },
+  pipe: { id: 'pipe', nameJa: '鉄パイプ', mat: 'scrap_metal', length: 1.2, mass: 1.6, edge: 0, point: 0, blunt: 0.4, color: 0x7a7e84, visual: { proc: 'pipe' } },
+  sharp_stone: { id: 'sharp_stone', nameJa: 'とがった石', mat: 'stone', length: 0.16, mass: 0.35, edge: 0.4, point: 0.85, blunt: 0.1, color: 0x8c8580, visual: { proc: 'stone' } },
+  heavy_stone: { id: 'heavy_stone', nameJa: '重い石', mat: 'stone', length: 0.26, mass: 2.0, edge: 0, point: 0, blunt: 1, color: 0x6e6862, visual: { proc: 'heavy' } },
+  blade: { id: 'blade', nameJa: '金属の刃', mat: 'scrap_metal', length: 0.32, mass: 0.5, edge: 0.9, point: 0.3, blunt: 0, color: 0xa8acb2, visual: { proc: 'blade' } },
+  fiber: { id: 'fiber', nameJa: '菌糸のひも', mat: 'fiber', length: 0.5, mass: 0.05, edge: 0, point: 0, blunt: 0, binding: true, color: 0xd8c8e8, visual: { proc: 'fiber' } },
+  quartz: { id: 'quartz', nameJa: '石英のかけら', mat: 'quartz', length: 0.22, mass: 0.35, edge: 1, point: 0.9, blunt: 0, color: 0xe8f0ff, visual: { proc: 'quartz', important: true } },
+  ore: { id: 'ore', nameJa: '鉄鉱石', mat: 'hematite', length: 0.3, mass: 3.2, edge: 0, point: 0, blunt: 1, color: 0x8a3a2a, visual: { proc: 'ore', important: true } },
+  fungus_stem: { id: 'fungus_stem', nameJa: '菌の茎', mat: 'fungus', length: 1.1, mass: 0.4, edge: 0, point: 0, blunt: 0.2, color: 0xb8a8d8, visual: { proc: 'stem' } },
 };
