@@ -2,7 +2,7 @@
 // interactable "thing". Logic (what happens) is in main.ts + game/*; this file only places things.
 import * as THREE from 'three';
 import { ColliderWorld } from '../../world/colliders';
-import { buildCaveMeshes, heightAt, SPOTS, RIVER, CHASM, CORRIDORS, ZONES, vnoise } from './cavern';
+import { buildCaveMeshes, FLOOR_SEG, heightAt, SPOTS, RIVER, CHASM, CORRIDORS, ZONES, vnoise } from './cavern';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildDumpProps } from './dumpProps';
 import { Npc, Crawler, Snail, Hakobi, FishSchool, glowMotes, type NpcLook } from './actors';
@@ -54,7 +54,7 @@ export function buildWorld() {
   let seed = 7;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 
-  const { floor, ceiling } = buildCaveMeshes(window.innerWidth < 900 ? 200 : 256);
+  const { floor, ceiling } = buildCaveMeshes(FLOOR_SEG);
   root.add(floor, ceiling);
 
   // ── helpers ──

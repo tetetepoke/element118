@@ -195,8 +195,25 @@ function sample(x: number, z: number): Sample {
   return _s;
 }
 
+/** floor mesh resolution (coarser on phones); collision uses the same grid so feet sit on the drawn floor */
+export const FLOOR_SEG = typeof window !== 'undefined' && window.innerWidth < 900 ? 200 : 256;
+const FCELL = (HALF * 2) / FLOOR_SEG;
+const fgrid = new Float32Array((FLOOR_SEG + 1) * (FLOOR_SEG + 1)).fill(NaN);
+const fv = (i: number, j: number) => {
+  i = Math.max(0, Math.min(FLOOR_SEG, i)); j = Math.max(0, Math.min(FLOOR_SEG, j));
+  const k = j * (FLOOR_SEG + 1) + i;
+  let h = fgrid[k];
+  if (h !== h) h = fgrid[k] = sample(-HALF + i * FCELL, -HALF + j * FCELL).floor;
+  return h;
+};
+/** floor height exactly as drawn: the same triangles as the floor mesh (PlaneGeometry split along b–d) */
 export function heightAt(x: number, z: number) {
-  return sample(x, z).floor;
+  const gx = (x + HALF) / FCELL, gz = (z + HALF) / FCELL;
+  const i = Math.floor(gx), j = Math.floor(gz), u = gx - i, v = gz - j;
+  const ha = fv(i, j), hb = fv(i, j + 1), hd = fv(i + 1, j);
+  if (u + v <= 1) return ha + (hd - ha) * u + (hb - ha) * v;
+  const hc = fv(i + 1, j + 1);
+  return hc + (hb - hc) * (1 - u) + (hd - hc) * (1 - v);
 }
 export function ceilAt(x: number, z: number) {
   return sample(x, z).ceil;
