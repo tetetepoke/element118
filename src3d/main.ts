@@ -9,6 +9,7 @@ import { input, initKeyboardMouse, initTouch, pollInput, endFrame, bindButton } 
 import { load3d, save3d } from './core/storage';
 import { PlayerController } from './player/controller';
 import { ProceduralCarbon, ProceduralSilica } from './player/visual';
+import { CarbonModel } from './player/carbonModel';
 import { BondFx } from './fx/bondFx';
 import { setGround } from './world/ground';
 import { meadowGround } from './world/terrain';
@@ -86,7 +87,10 @@ const field = buildField();
 scene.add(field.root);
 
 // ── characters ──
-const carbonVisual = new ProceduralCarbon();
+// Carbon: the official GLB (3d/models/carbon.glb) replaces the placeholder once it has loaded.
+// Until then — or if it cannot load — the placeholder is shown and everything works the same.
+const carbonVisual = new CarbonModel(new ProceduralCarbon());
+void carbonVisual.load(new URL('models/carbon.glb', document.baseURI).href);
 scene.add(carbonVisual.root);
 const player = new PlayerController(carbonVisual, field.colliders);
 const silica = new ProceduralSilica();
