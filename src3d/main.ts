@@ -12,6 +12,9 @@ import { ProceduralCarbon, ProceduralSilica } from './player/visual';
 import { CarbonModel } from './player/carbonModel';
 import { BondFx } from './fx/bondFx';
 import { setGround } from './world/ground';
+import { CollisionDebug } from './world/collisionDebug';
+import { TUNING as MOVE } from './player/controller';
+import { CAMERA_TUNING } from './core/camera';
 import { meadowGround } from './world/terrain';
 setGround(meadowGround); // before anything touches the ground
 import { ABILITIES, ELEMENTS, FORMS, OBSTACLE_SOLUTIONS, PROPERTIES, recipeFor, type BondForm } from './chem/bondData';
@@ -136,6 +139,9 @@ scene.add(fx.root);
 const tmpV = new THREE.Vector3();
 
 const cam = new ThirdPersonCamera(camera, field.colliders);
+// developer view of collision shapes: add ?collision to the address
+const colDebug = new CollisionDebug(scene, field.colliders);
+colDebug.visible = new URLSearchParams(location.search).has('collision');
 initKeyboardMouse(renderer.domElement);
 initTouch($('view'), $('stickBase'), $('stickKnob'));
 bindButton($('bJump'), () => (input.jump = true));
@@ -459,6 +465,7 @@ function frame(now: number) {
 
   // camera + sun follow
   cam.update(dt, player.pos, player.moving, player.facing);
+  colDebug.update(dt, { pos: player.pos, radius: MOVE.radius, height: MOVE.height }, { pivot: cam.pivotPoint, cam: camera.position, radius: CAMERA_TUNING.radius });
   placeBlob(carbonBlob, player.pos, true);
   placeBlob(silicaBlob, silica.root.position, silica.root.visible);
   if (shake > 0) {
@@ -494,7 +501,7 @@ for (const ev of ['gesturestart', 'gesturechange', 'dblclick']) document.addEven
 document.addEventListener('visibilitychange', () => { if (document.hidden) persist(); });
 
 // for automated tests
-(window as unknown as Record<string, unknown>).__proto3d = { player, state, field, cam, silica, input, fx, carbon: carbonVisual, dbg, stepFx, doBond, doBreak, doHardBreak };
+(window as unknown as Record<string, unknown>).__proto3d = { player, state, field, cam, silica, input, fx, carbon: carbonVisual, dbg, stepFx, doBond, doBreak, doHardBreak, colDebug };
 
 player.visual.root.position.copy(player.pos);
 showMsg(isTouch ? '左側で移動、右側をスワイプでカメラ。遠くの光る尖塔をめざそう。' : 'WASDで移動、マウスでカメラ（クリックで固定）。遠くの光る尖塔をめざそう。', 6);

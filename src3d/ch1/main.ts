@@ -13,6 +13,8 @@ import { ThirdPersonCamera, CAMERA_TUNING } from '../core/camera';
 Object.assign(CAMERA_TUNING, { distance: 4.2, pivotHeight: 1.2, lookAbove: 1.05, pitch: 0.1, minPitch: -0.35 });
 import { PlayerController } from '../player/controller';
 import { ProceduralCarbon, ProceduralSilica } from '../player/visual';
+import { CollisionDebug } from '../world/collisionDebug';
+import { TUNING as MOVE } from '../player/controller';
 import { BondFx } from '../fx/bondFx';
 import { ui, wait, showScan, showBag, showCodex, setAutoAdvance, autoAdvance, showGot, dismissGot, gotIsOpen } from './ui';
 import { viewerStats } from './itemViewer';
@@ -103,6 +105,10 @@ scene.add(silica.root);
 const fx = new BondFx();
 scene.add(fx.root);
 const cam = new ThirdPersonCamera(camera, world.colliders);
+// developer view: collision shapes (settings → 衝突判定表示); off in normal play, its own key
+const colDebug = new CollisionDebug(scene, world.colliders);
+const DEV_KEY = 'element118.ch1.dev';
+try { colDebug.visible = JSON.parse(localStorage.getItem(DEV_KEY) ?? '{}').collision === true; } catch { /* off */ }
 cam.extraSolid = (x, y, z) => y > ceilAt(x, z) - 0.35 || y < heightAt(x, z);
 const blob = (() => {
   const cv = document.createElement('canvas');
@@ -1041,7 +1047,10 @@ function openSettings() {
   $('settingsPanel').innerHTML = `<button class="small close" id="setX">とじる</button><h2>設定</h2><div class="kind">カメラ感度</div>
     ${row('touch', 'タッチ（右スティック）')}${row('gamepad', 'ゲームパッド（右スティック）')}${row('mouse', 'マウス')}
     <div class="setrow"><span>上下反転（Invert Y）</span><input type="checkbox" id="setInv" ${s.invertY ? 'checked' : ''}></div>
-    <div class="note">移動はいつもカメラの向きが基準（スティック上＝画面の奥）。</div>`;
+    <div class="note">移動はいつもカメラの向きが基準（スティック上＝画面の奥）。</div>
+    <div class="kind">開発者向け</div>
+    <div class="setrow"><span>衝突判定表示</span><input type="checkbox" id="setCol" ${colDebug.visible ? 'checked' : ''}></div>
+    <div class="note">緑＝プレイヤー　赤＝障害物　青＝地形　黄＝カメラ</div>`;
   $('setX').onclick = () => ui.close('settingsWrap');
   const save = () => { try { localStorage.setItem(INPUT_KEY, JSON.stringify(inputSettings)); } catch { /* ignore */ } };
   document.querySelectorAll<HTMLInputElement>('#settingsPanel input[type=range]').forEach((el) => (el.oninput = () => {
@@ -1051,6 +1060,10 @@ function openSettings() {
     save();
   }));
   ($('setInv') as HTMLInputElement).onchange = (e) => { applySettings({ invertY: (e.target as HTMLInputElement).checked }); save(); };
+  ($('setCol') as HTMLInputElement).onchange = (e) => {
+    colDebug.visible = (e.target as HTMLInputElement).checked;
+    try { localStorage.setItem(DEV_KEY, JSON.stringify({ collision: colDebug.visible })); } catch { /* ignore */ }
+  };
   ui.open('settingsWrap');
 }
 function cycleTool(dir: 1 | -1) {
@@ -1204,6 +1217,7 @@ function frame(now: number) {
   } else {
     cam.update(dt, player.pos, player.moving, player.facing);
     camPos.copy(camera.position);
+    colDebug.update(dt, { pos: player.pos, radius: MOVE.radius, height: MOVE.height }, { pivot: cam.pivotPoint, cam: camera.position, radius: CAMERA_TUNING.radius });
     camLook.copy(player.pos).add(new THREE.Vector3(0, 1.2, 0));
   }
   // safety net (cut-scene cameras too): never above the cave ceiling
@@ -1303,7 +1317,7 @@ requestAnimationFrame(frame);
 
 // test hooks
 (window as unknown as { __ch1: unknown }).__ch1 = {
-  get S() { return S; }, player, world, cam, silica, carbon, fx, ui, zones: ZONES,
+  get S() { return S; }, player, world, cam, silica, carbon, fx, ui, zones: ZONES, colDebug,
   begin, onAction, onScan, onForm, makeFromDesign, equip, input, viewerStats, gotIsOpen, dismissGot, gotItem, understood, openBag, get tools() { return tools; }, heightAt, ceilAt, zoneAt,
   get renderInfo() { return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries }; },
   get cutscene() { return cutscene; }, level: (s: 'Si') => level(S.k, s), persist,

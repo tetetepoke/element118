@@ -8,6 +8,7 @@ import type { ColliderWorld } from '../world/colliders';
 export const CAMERA_TUNING = {
   distance: 4.6,
   minDistance: 0.8,
+  hardMinDistance: 0.12, // backed against a wall: the camera comes right in rather than into the wall
   pivotHeight: 1.35, // orbit point above the feet
   lookAbove: 0.75, // aim a little above the head → Carbon sits low in the frame
   lookAhead: 0, // aim ahead of Carbon along the camera's forward (0 = pure orbit)
@@ -35,6 +36,8 @@ export class ThirdPersonCamera {
   extraSolid: ((x: number, y: number, z: number) => boolean) | null = null;
   /** distance after obstacles (tests read it) */
   get distance() { return this.curDist; }
+  /** orbit point (debug view) */
+  get pivotPoint() { return this.pivot; }
 
   constructor(public cam: THREE.PerspectiveCamera, private colliders: ColliderWorld) {}
 
@@ -87,7 +90,9 @@ export class ThirdPersonCamera {
 
     const target = focus.clone();
     target.y += C.pivotHeight;
-    if (this.first) { this.pivot.copy(target); this.first = false; }
+    // first frame, or Carbon was moved far at once (warp, loaded save): jump there, don't drift
+    // through the rock in between
+    if (this.first || this.pivot.distanceToSquared(target) > 16) { this.pivot.copy(target); this.first = false; }
     const kxz = 1 - Math.exp(-dt * C.followXZ), ky = 1 - Math.exp(-dt * C.followY);
     this.pivot.x += (target.x - this.pivot.x) * kxz;
     this.pivot.z += (target.z - this.pivot.z) * kxz;
@@ -104,7 +109,9 @@ export class ThirdPersonCamera {
     for (const off of [side, side.clone().negate(), up, up.clone().negate()]) {
       free = Math.min(free, this.clearFraction(this.pivot, desired.clone().add(off)) + 0.08);
     }
-    const want = Math.max(C.minDistance, C.distance * Math.min(1, free) - C.radius * 0.5);
+    let want = Math.max(C.minDistance, C.distance * Math.min(1, free) - C.radius * 0.5);
+    // a wall right behind Carbon: the usual minimum would put the lens inside it, so come closer
+    if (C.distance * free < C.minDistance + C.radius) want = Math.max(C.hardMinDistance, C.distance * free - C.radius * 0.5);
     this.curDist = want < this.curDist ? want : this.curDist + (want - this.curDist) * (1 - Math.exp(-dt * C.returnSpeed));
     this.cam.position.copy(this.pivot).addScaledVector(dir, this.curDist);
     const close = this.curDist / C.distance;

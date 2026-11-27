@@ -213,6 +213,7 @@ export function waterAt(x: number, z: number): number | null {
 export const caveGround: Ground = {
   heightAt,
   waterAt,
+  ceilingAt: ceilAt,
   half: HALF,
   spawn: { x: SPOTS.wake.x, z: SPOTS.wake.y },
 };

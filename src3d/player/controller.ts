@@ -29,11 +29,15 @@ export const TUNING = {
   coyote: 0.12,
   jumpBuffer: 0.14,
   radius: 0.34,
-  height: 1.7,
+  height: 1.45, // capsule height: Carbon's visible height plus a little (he fits under what he looks like he fits under)
   step: 0.45,
   maxSlope: 1.2, // rise per metre (≈50°)
   ledgeMax: 2.3,
   airLedgeMax: 1.5,
+  // ── collision (the body is a vertical capsule: radius × height) ──
+  footPad: 0.14, // the base is a disc: tops this far around the centre still hold the player up
+  subStep: 0.12, // longest move per collision step (m): fast moves are split, nothing thin is skipped
+  stuckTime: 0.25, // still inside something this long → back to the last safe spot
 };
 
 export class PlayerController {
@@ -55,10 +59,18 @@ export class PlayerController {
   private climb: { t: number; len: number; from: THREE.Vector3; to: THREE.Vector3 } | null = null;
   private airTime = 0;
   private minFallVy = 0;
+  /** last position standing free on the ground (fallback if the body ever ends up inside something) */
+  readonly lastSafe = new THREE.Vector3();
+  private stuckT = 0;
+  /** how deep the body was inside something after the last step (tests / debug view) */
+  penetration = 0;
+  /** times the safe-spot fallback fired (tests) */
+  rescues = 0;
 
   constructor(public visual: CharacterVisual, private colliders: ColliderWorld) {
     const sp = getGround().spawn;
     this.pos.set(sp.x, heightAt(sp.x, sp.z), sp.z);
+    this.unstick();
   }
 
   /** Swap the model (e.g. the official GLB) without touching control. */
@@ -76,6 +88,30 @@ export class PlayerController {
     this.climb = null;
     this.takeoffT = 0;
     this.onGround = true;
+    this.unstick();
+  }
+
+  /**
+   * If the body starts inside something (loaded save, warp, a door that closed on it), move it to the
+   * nearest free spot around. Searches rings out to 3 m; stays put if nothing better is found.
+   */
+  unstick() {
+    const T = TUNING, C = this.colliders;
+    const free = (x: number, z: number, y: number) => C.penetration(x, z, y, T.radius, T.height, T.step) < 0.01;
+    if (free(this.pos.x, this.pos.z, this.pos.y)) { this.lastSafe.copy(this.pos); return true; }
+    for (let r = 0.25; r <= 3; r += 0.25) {
+      const n = Math.max(8, Math.round(r * 10));
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const x = this.pos.x + Math.sin(a) * r, z = this.pos.z + Math.cos(a) * r;
+        const y = C.groundAt(x, z, this.pos.y, T.step + 0.6, T.footPad);
+        if (Math.abs(y - this.pos.y) > 1.2 || !free(x, z, y)) continue;
+        this.pos.set(x, y, z);
+        this.lastSafe.copy(this.pos);
+        return true;
+      }
+    }
+    return false;
   }
 
   get moving() {
@@ -175,13 +211,16 @@ export class PlayerController {
       if (this.tryLedge(fwd, T.airLedgeMax)) return;
     }
 
-    // ── horizontal move with slope / wall checks ──
+    // ── horizontal move: the capsule moves in short sub-steps; after each one it is pushed out of
+    //    solids and steep terrain (several passes), which also makes it slide along walls ──
     const stepX = this.vel.x * dt, stepZ = this.vel.z * dt;
+    const pad = T.footPad;
+    const sideStep = T.step;
     const tryMove = (dx: number, dz: number) => {
       const nx = this.pos.x + dx, nz = this.pos.z + dz;
       const len = Math.hypot(dx, dz);
       if (len < 1e-6) return true;
-      const g = this.colliders.groundAt(nx, nz, this.pos.y, T.step);
+      const g = this.colliders.groundAt(nx, nz, this.pos.y, T.step, pad);
       const rise = g - this.pos.y;
       const terrNew = heightAt(nx, nz);
       if (g <= terrNew + 1e-3) {
@@ -193,18 +232,36 @@ export class PlayerController {
       this.pos.z = nz;
       return true;
     };
-    if (!tryMove(stepX, stepZ)) {
-      const okX = tryMove(stepX, 0), okZ = tryMove(0, stepZ);
-      if (!okX && !okZ) this.speed *= 0.5; // walked into a wall
+    const ox = this.pos.x, oz = this.pos.z;
+    const n = Math.max(1, Math.min(8, Math.ceil(Math.hypot(stepX, stepZ) / T.subStep)));
+    const p2 = { x: 0, z: 0 };
+    let blocked = 0, inside = 0;
+    for (let i = 0; i < n; i++) {
+      const sx = stepX / n, sz = stepZ / n;
+      if (!tryMove(sx, sz)) {
+        const okX = tryMove(sx, 0), okZ = tryMove(0, sz);
+        if (!okX && !okZ) blocked++;
+      }
+      p2.x = this.pos.x; p2.z = this.pos.z;
+      const r = this.colliders.resolve(p2, this.pos.y, T.radius, T.height, sideStep, sideStep);
+      this.pos.x = p2.x; this.pos.z = p2.z;
+      inside = r.residual;
     }
-    const p2 = { x: this.pos.x, z: this.pos.z };
-    this.colliders.pushOut(p2, this.pos.y, T.radius, T.height, T.step);
+    if (blocked === n && n > 0) this.speed *= 0.5; // walked into a slope wall
+    else if (grounded && this.speed > 1) {
+      // pushing head-on into a wall: slow to the speed actually made (min 1 m/s keeps a walk in place)
+      const made = Math.hypot(this.pos.x - ox, this.pos.z - oz) / dt;
+      if (made < this.speed * 0.3) this.speed = Math.max(1, this.speed - T.decel * 0.6 * dt);
+    }
+    this.penetration = inside;
     const half = getGround().half;
-    this.pos.x = THREE.MathUtils.clamp(p2.x, -half + 4, half - 4);
-    this.pos.z = THREE.MathUtils.clamp(p2.z, -half + 4, half - 4);
+    this.pos.x = THREE.MathUtils.clamp(this.pos.x, -half + 4, half - 4);
+    this.pos.z = THREE.MathUtils.clamp(this.pos.z, -half + 4, half - 4);
 
     // ── vertical ──
-    const ground = this.colliders.groundAt(this.pos.x, this.pos.z, this.pos.y, T.step);
+    // in the air the whole base disc counts, so a body overlapping an edge lands on it instead of hanging in it
+    const ground = this.colliders.groundAt(this.pos.x, this.pos.z, this.pos.y, T.step, this.onGround ? pad : T.radius + 0.03);
+    const prevY = this.pos.y;
     if (swim) {
       this.vel.y = 0;
       this.pos.y += (this.waterY - 0.95 - this.pos.y) * (1 - Math.exp(-dt * 6));
@@ -228,8 +285,14 @@ export class PlayerController {
       this.vel.y = Math.max(T.terminal, this.vel.y - g * dt);
       this.minFallVy = Math.min(this.minFallVy, this.vel.y);
       this.pos.y += this.vel.y * dt;
+      // head into a ceiling (an overhang, a cave roof): stop rising
+      if (this.vel.y > 0) {
+        const ceil = this.colliders.ceilingAt(this.pos.x, this.pos.z, prevY, T.height, -0.25);
+        if (this.pos.y + T.height > ceil) { this.pos.y = Math.max(ground, ceil - T.height); this.vel.y = 0; }
+      }
       if (this.pos.y <= ground) {
         this.pos.y = ground;
+        this.settleOnEdge(ground);
         const impact = THREE.MathUtils.clamp((-this.minFallVy - 4) / 14, 0, 1);
         this.vel.y = 0;
         this.onGround = true;
@@ -239,6 +302,19 @@ export class PlayerController {
           this.info.impact = impact;
         }
       }
+    }
+
+    // ── safety net: remember where it was free; if the body stays inside something (or ends up under
+    //    the terrain) put it back there ──
+    if (this.onGround && !swim && inside < 0.02 && this.pos.y >= heightAt(this.pos.x, this.pos.z) - 0.05) this.lastSafe.copy(this.pos);
+    this.stuckT = inside > 0.08 ? this.stuckT + dt : 0;
+    if (this.stuckT > T.stuckTime || this.pos.y < heightAt(this.pos.x, this.pos.z) - 1.2) {
+      this.pos.copy(this.lastSafe);
+      this.vel.set(0, 0, 0);
+      this.speed = 0;
+      this.onGround = true;
+      this.stuckT = 0;
+      this.rescues++;
     }
 
     // ── model facing follows the travel direction smoothly ──
@@ -269,6 +345,21 @@ export class PlayerController {
   private applyVisual() {
     this.visual.root.position.copy(this.pos);
     this.visual.root.rotation.y = this.facing;
+  }
+
+  /**
+   * Landed with only the edge of the base disc on a top: step the centre in a little so the feet are
+   * really on it (otherwise the next frame would drop off again).
+   */
+  private settleOnEdge(top: number) {
+    const T = TUNING, C = this.colliders;
+    if (C.groundAt(this.pos.x, this.pos.z, top, 0.05, T.footPad) >= top - 0.02) return;
+    const d = T.radius + 0.03 - T.footPad + 0.02;
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2;
+      const x = this.pos.x + Math.sin(a) * d, z = this.pos.z + Math.cos(a) * d;
+      if (C.groundAt(x, z, top, 0.05, T.footPad) >= top - 0.02 && C.penetration(x, z, top, T.radius, T.height, T.step) < 0.01) { this.pos.x = x; this.pos.z = z; return; }
+    }
   }
 
   /** Climb onto a ledge in front if it is within reach and flat on top. */

@@ -65,7 +65,7 @@ export function buildWorld() {
     m.rotation.y = -(o.rot ?? 0);
     m.castShadow = m.receiveShadow = true;
     (o.parent ?? root).add(m);
-    if (o.collide !== false) colliders.add({ id, kind: 'box', x, z, hx: w / 2, hz: d / 2, rot: o.rot ?? 0, bottom: y - 2, top: y + h, tags: o.tags });
+    if (o.collide !== false) colliders.add({ id, kind: 'box', x, z, hx: w / 2, hz: d / 2, rot: o.rot ?? 0, bottom: y - 2, top: y + h, tags: o.tags, model: m });
     return m;
   };
   const cyl = (id: string, x: number, z: number, r: number, h: number, mat: THREE.Material, o: { y?: number; collide?: boolean; seg?: number; top?: number } = {}) => {
@@ -74,7 +74,7 @@ export function buildWorld() {
     m.position.set(x, y + h / 2, z);
     m.castShadow = m.receiveShadow = true;
     root.add(m);
-    if (o.collide !== false) colliders.add({ id, kind: 'cyl', x, z, r, bottom: y - 2, top: y + h });
+    if (o.collide !== false) colliders.add({ id, kind: 'cyl', x, z, r, bottom: y - 2, top: y + h, model: m });
     return m;
   };
   /** a wall across a corridor at parameter t (0..1) */
