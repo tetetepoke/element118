@@ -109,36 +109,74 @@ export class CarbonModel implements CharacterVisual {
     let foot: THREE.Object3D | null = null;
     scene.traverse((o) => { if (!foot && (o as THREE.Bone).isBone && /(left|_l\b|\.l\b|l_).*?(foot|ankle)|(foot|ankle).*?(left|_l\b|\.l\b)/i.test(o.name)) foot = o; });
     if (!foot) scene.traverse((o) => { if (!foot && (o as THREE.Bone).isBone && /foot|ankle/i.test(o.name)) foot = o; });
+    // generic bone names (bone_0…): the foot is the lowest bone in the rest pose, the hips the top bone
+    const bones: THREE.Object3D[] = [];
+    scene.traverse((o) => { if ((o as THREE.Bone).isBone) bones.push(o); });
+    scene.updateMatrixWorld(true);
+    const wp = (o: THREE.Object3D) => o.getWorldPosition(new THREE.Vector3());
+    if (!foot && bones.length) foot = bones.reduce((a, o) => (wp(o).y < wp(a).y ? o : a));
+    const hips = bones.find((o) => !(o.parent as THREE.Bone)?.isBone) ?? null;
     if (!foot) return;
     const f = foot as THREE.Object3D;
-    const p = new THREE.Vector3(), inv = new THREE.Matrix4();
+    const p = new THREE.Vector3(), h = new THREE.Vector3(), inv = new THREE.Matrix4();
     for (const name of [CARBON_ANIM.walk, CARBON_ANIM.jog, CARBON_ANIM.sprint]) {
       const a = this.actions.get(name);
       if (!a) continue;
       const dur = a.getClip().duration;
       this.mixer.stopAllAction();
       a.reset().play();
-      let min = Infinity, max = -Infinity;
-      for (let i = 0; i <= 24; i++) {
-        this.mixer.setTime((i / 24) * dur);
+      const N = 96, zs: number[] = [];
+      for (let i = 0; i < N; i++) {
+        this.mixer.setTime((i / N) * dur);
         scene.updateMatrixWorld(true);
         inv.copy(scene.matrixWorld).invert();
         f.getWorldPosition(p).applyMatrix4(inv); // in the model's own space (forward = +z)
-        const z = p.z * scene.scale.z;
-        min = Math.min(min, z);
-        max = Math.max(max, z);
+        if (hips && hips !== f) p.sub(hips.getWorldPosition(h).applyMatrix4(inv)); // ignore root motion
+        zs.push(p.z * scene.scale.z);
       }
-      const stride = (max - min) * 2; // one foot covers the stride twice per cycle (both steps)
-      if (stride > 0.05 && dur > 0) CARBON_ANIM.clipSpeed[name] = stride / dur;
+      const min = Math.min(...zs), max = Math.max(...zs), mid = (min + max) / 2;
+      // a clip can hold several gait cycles: count them by the foot swinging forward past the middle
+      let cycles = 0;
+      for (let i = 0; i < N; i++) if (zs[i] < mid && zs[(i + 1) % N] >= mid) cycles++;
+      cycles = Math.max(1, cycles);
+      const stride = (max - min) * 2; // the body moves about twice the foot's swing per gait cycle
+      if (stride > 0.05 && dur > 0) CARBON_ANIM.clipSpeed[name] = (stride * cycles) / dur;
       a.stop();
     }
+    // keep the order Walk < Jog < Sprint (a short, in-place sprint loop can measure low)
+    const cs = CARBON_ANIM.clipSpeed, W = CARBON_ANIM.walk, J = CARBON_ANIM.jog, S = CARBON_ANIM.sprint;
+    cs[J] = Math.max(cs[J], cs[W] * 1.4);
+    cs[S] = Math.max(cs[S], cs[J] * 1.4);
+    // switch clips halfway between their natural speeds, so each plays near 1x
+    CARBON_ANIM.jogFrom = (cs[W] + cs[J]) / 2;
+    // Sprint only when actually running (walk 3.9 m/s → Jog, run 7.6 m/s → Sprint)
+    CARBON_ANIM.sprintFrom = Math.max((cs[J] + cs[S]) / 2, 5.2);
     this.mixer.stopAllAction();
     this.current = null;
+  }
+
+  /**
+   * Add the clips of the full file (carbon_all.glb: all 27 moves) so any of them can be played by name.
+   * Only loaded when asked for, so the normal start stays light. Same skeleton, so tracks bind by bone name.
+   */
+  async loadAllClips(url: string) {
+    if (!this.mixer) return false;
+    try {
+      const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+      const gltf = await new GLTFLoader().loadAsync(url);
+      for (const clip of gltf.animations) if (!this.actions.has(clip.name)) this.actions.set(clip.name, this.mixer.clipAction(clip));
+      return true;
+    } catch (e) {
+      console.warn('extra Carbon clips not loaded:', e);
+      return false;
+    }
   }
 
   /** names of every clip in the file */
   get clipNames() { return [...this.actions.keys()]; }
   get currentClip() { return this.current?.getClip().name ?? null; }
+  /** measured ground speed (m/s) of each locomotion clip at 1x */
+  get clipSpeeds() { return { ...CARBON_ANIM.clipSpeed }; }
   get timeScale() { return this.current?.timeScale ?? 1; }
 
   private fadeTo(name: string, loop = true) {
@@ -176,7 +214,7 @@ export class CarbonModel implements CharacterVisual {
     this.fadeTo(name, name !== A.jump);
     // keep the feet in step with the ground speed
     const cs = A.clipSpeed[name];
-    if (this.current) this.current.timeScale = cs ? THREE.MathUtils.clamp(mps / cs, 0.5, 2.4) : 1;
+    if (this.current) this.current.timeScale = cs ? THREE.MathUtils.clamp(mps / cs, 0.5, 2.2) : 1;
   }
 
   setForm(variant: string) {
