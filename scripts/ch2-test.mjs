@@ -129,8 +129,10 @@ await act();
 check((await S()).flags.legend, 'keeper: the copper child sleeps in the deep vein');
 
 console.log('the deep vein: rubble (SiC), bugs, Cupra');
-r = await walk([[-20, 6], [-31, 7], [-38, 3], [-56, -8], [-58, -16], [-58.5, -25]], { jump: true });
+await walk([[-20, 6], [-31, 7], [-38, 3], [-56, -8], [-58, -16]], { jump: true });
+r = await walk([[-58.5, -26.6]], { walk: true });
 check(r.d < 1.5, `reached the rubble (${r.x}, ${r.y}, ${r.z})`);
+check(await waitFor(() => document.getElementById('prompt').textContent.includes('しらべる（緑の岩くず）'), 5000), 'rubble is in interaction range');
 await act();
 check(!(await S()).flags.dummy && !(await G((G) => G.world.things.find((t) => t.id === 'rubble').broken)), 'bare hands cannot break the green rubble');
 await G((G) => G.silica.root.position.copy(G.player.pos).add({ x: 1, y: 0, z: 1 }));
