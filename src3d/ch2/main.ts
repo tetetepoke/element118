@@ -100,9 +100,9 @@ const cuOverlay = buildCuOverlay();
 carbon.root.add(cuOverlay);
 const player = new PlayerController(carbon, world.colliders);
 player.speedMul = CHAPTER_MOVE_SPEED;
-const silica = new ProceduralSilica({ smooth: true });
+const silica = new ProceduralSilica({ smooth: true, scale: CHAPTER_CARBON_SCALE });
 scene.add(silica.root);
-const cupra = new ProceduralCupra();
+const cupra = new ProceduralCupra(CHAPTER_CARBON_SCALE);
 cupra.root.visible = false;
 scene.add(cupra.root);
 const fx = new BondFx();
@@ -749,7 +749,7 @@ function doBreak(): Promise<void> {
     sfx.chime(false);
     fx.playBreak({
       from: () => carbon.anchor(new THREE.Vector3()).setY(P().y + 0.2),
-      to: () => new THREE.Vector3(at.x, at.y + 0.8, at.z),
+      to: () => new THREE.Vector3(at.x, at.y + 0.8 * CHAPTER_CARBON_SCALE, at.z),
       setProgress: (p) => setFormProgress(w, p),
       silica: v.root,
       onCommit: () => { S.form = 'normal'; S.partners[w] = 'follow'; persist(); },

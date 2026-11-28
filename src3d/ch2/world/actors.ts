@@ -10,12 +10,12 @@ export class ProceduralCupra {
   readonly root = new THREE.Group();
   private anim: BodyAnimator;
   private chest: THREE.Object3D;
-  constructor() {
+  constructor(scale = 1) {
     const b = buildBody({ skin: 0xf0d0b4, hair: 0xc8642e, tunic: 0x3a7a62, pants: 0x4a3a2e, boots: 0xb87038, sleeve: 0x4a8a72, glove: 0xc87a48, hairStyle: 'swept', smooth: true, headScale: 1.1 });
     this.anim = new BodyAnimator(b);
     this.chest = b.chest;
     this.root.add(b.root);
-    b.root.scale.setScalar(0.95);
+    b.root.scale.setScalar(0.95 * scale);
     // patina cloak and copper bands
     const cloak = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.75, 14, 1, true), std(0x2f8a6a, { side: THREE.DoubleSide, roughness: 0.9 }));
     cloak.position.set(0, 0.32, -0.04);
