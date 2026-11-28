@@ -4,8 +4,8 @@ import * as THREE from 'three';
 import { ColliderWorld } from '../../world/colliders';
 import { addFieldObject } from '../../world/fieldObjects';
 import { buildCaveMeshes, FLOOR_SEG, heightAt, SPOTS, RIVER, CHASM, CORRIDORS, ZONES, vnoise } from './cavern';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildDumpProps } from './dumpProps';
+import { createFungusGeometries, createGlowPlantGeometry } from './fungusDetails';
 import { Npc, Crawler, Snail, Hakobi, FishSchool, glowMotes, type NpcLook } from './actors';
 
 export type ThingKind = 'pick' | 'node' | 'obstacle' | 'npc' | 'device' | 'scan' | 'plate';
@@ -337,8 +337,8 @@ export function buildWorld() {
   const crack = box('city_crack', ck.x, ck.z, ck.w, 7, 1.8, crackM, { rot: ck.rot, y: ck.y - 0.5 });
   things.push({ id: 'city_crack', kind: 'obstacle', mat: 'hard_rock', pos: crack.position.clone().setY(ck.y + 1), r: 3.6, obj: crack, colliders: ['city_crack'], onBreak: 'shortcut', label: 'ひびの入った岩壁' });
   // glowing plants that live on the roots' light (ネビカリ草)
-  const plantM = std(0x7ad0ff, { emissive: 0x2a8ad0, emissiveIntensity: 1.3 });
-  const plantG = mergeGeometries([new THREE.CylinderGeometry(0.015, 0.025, 0.4, 4).translate(0, 0.2, 0).toNonIndexed(), new THREE.IcosahedronGeometry(0.07, 0).translate(0, 0.43, 0)]);
+  const plantM = std(0xbde7fc, { vertexColors: true, emissive: 0x164564, emissiveIntensity: 0.7 });
+  const plantG = createGlowPlantGeometry();
   const plantSpots: [number, number, number][] = [[38, 10, 14], [8, 104, 10], [-60, -22, 10], [-64, -86, 18], [6, -104, 8], [100, -18, 16], [82, 56, 8]];
   const plants = new THREE.InstancedMesh(plantG, plantM, 520);
   let pk = 0;
@@ -400,14 +400,16 @@ export function buildWorld() {
   // the grate where the river leaves (fall in and the current carries you here)
   for (let i = 0; i < 7; i++) cyl(`grate${i}`, RIVER.x1 + 4, RIVER.z - 3 + i, 0.08, 3, std(0x5a5a5a, { metalness: 0.6 }), { y: RIVER.level - 2, seg: 5 });
   // solution A: a tall fungus stalk on the bank. Cut or knock it down and it falls across.
+  const fungi = createFungusGeometries();
   const st = SPOTS.riverStalk;
   const stalk = new THREE.Group();
-  const stalkM = std(0xb8a8d8, { emissive: 0x3a2a5a, emissiveIntensity: 0.4 });
-  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.75, 16, 10), stalkM);
+  const stalkM = std(0xb8a8d8, { vertexColors: true, emissive: 0x3a2a5a, emissiveIntensity: 0.4 });
+  const stem = new THREE.Mesh(fungi.stem, stalkM);
+  stem.scale.set(0.75, 16, 0.75);
   stem.position.y = 8;
   stalk.add(stem);
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(2.6, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), std(0x8a6ab8, { emissive: 0x5a3aa0, emissiveIntensity: 0.9 }));
-  cap.scale.y = 0.5;
+  const cap = new THREE.Mesh(fungi.cap, std(0x9a78bb, { vertexColors: true, emissive: 0x382558, emissiveIntensity: 0.5 }));
+  cap.scale.set(2.6, 5.2, 2.6);
   cap.position.y = 16;
   stalk.add(cap);
   stalk.position.set(st.x, g(st.x, st.y), st.y);
@@ -435,15 +437,16 @@ export function buildWorld() {
 
   // ── 菌類の森 (fungus forest) ──
   const fz = ZONES.find((z) => z.id === 'fungus')!;
-  const capMats = [std(0x8a5ab8, { emissive: 0x5a2aa0, emissiveIntensity: 0.8 }), std(0x5ab8a8, { emissive: 0x1a8a7a, emissiveIntensity: 0.8 }), std(0xb85a8a, { emissive: 0x8a2a5a, emissiveIntensity: 0.7 })];
-  const stemM = std(0xd8d0e0);
+  const capMats = [0x9a6cc8, 0x65b9a8, 0xc379a1].map((color) => std(color, { vertexColors: true, emissive: color, emissiveIntensity: 0.055, roughness: 0.68 }));
+  const stemM = std(0xd8d0e0, { vertexColors: true });
   const mushroom = (id: string, x: number, z: number, h: number, r: number, mi: number, solid: boolean) => {
     const y = g(x, z);
-    const s = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.22, r * 0.3, h, 8), stemM);
+    const s = new THREE.Mesh(fungi.stem, stemM);
+    s.scale.set(r * 0.3, h, r * 0.3);
     s.position.set(x, y + h / 2, z);
     root.add(s);
-    const c = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), capMats[mi % 3]);
-    c.scale.y = 0.42;
+    const c = new THREE.Mesh(fungi.cap, capMats[mi % 3]);
+    c.scale.setScalar(r);
     c.position.set(x, y + h - 0.05, z);
     root.add(c);
     if (solid) {
