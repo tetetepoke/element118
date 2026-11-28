@@ -2,8 +2,10 @@
 // copper and tin places, the deep vein, the old power station, people and creatures.
 // Placement only; what happens is decided in ../main.ts.
 import * as THREE from 'three';
+import { caveCanopy, caveWallLife } from '../../world/caveLife';
+import { addCaveHouseholds } from '../../world/caveHousehold';
 import { ColliderWorld } from '../../world/colliders';
-import { buildMineMeshes, heightAt, SPOTS, STREAM, CORRIDORS, vnoise } from './mine';
+import { buildMineMeshes, heightAt, ceilAt, ZONES, SPOTS, STREAM, CORRIDORS, vnoise } from './mine';
 import { Npc, type NpcLook } from '../../ch1/world/actors';
 import { Bug, mothSwarm } from './actors';
 
@@ -387,8 +389,17 @@ export function buildWorld() {
     lights.push({ pos: new THREE.Vector3(x, g(x, z) + 3, z), color: 0xffa860, power: 1.4 });
   }
 
+  caveCanopy(root, [
+    [[-6, 91], [-2, 88], [3, 89], [8, 92]],
+    [[-2, 62], [-1.4, 58], [1.2, 54], [2, 50]],
+    [[-12, 17], [-3, 12], [7, 14], [17, 17]],
+    [[-72, -62], [-66, -58], [-60, -60], [-53, -58]],
+  ], g, ceilAt, lights);
+  const updateWallLife = caveWallLife(root, ZONES.filter((zone) => ['adit', 'green', 'village', 'deep'].includes(zone.id)), g);
+  addCaveHouseholds(root, colliders, g, [[-9, 4], [17.6, 22.7], [23, -6]]);
+
   return {
-    root, colliders, things, lights, npcs, bugs, shaftRoot,
+    root, colliders, things, lights, npcs, updateWallLife, bugs, shaftRoot,
     parts: { gateL, gateR, emblem, liftG, liftLamp, cableM, lineM, panelM, gapMarks, plateFace: face, geode: geo },
     update(t: number, dt: number) { for (const u of updaters) u(t, dt); },
   };

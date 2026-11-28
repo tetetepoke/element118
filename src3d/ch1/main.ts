@@ -2,6 +2,7 @@
 // The playable first chapter, built on the 3D prototype's movement, camera and character code.
 // Saves only under element118.ch1.* (the 2D game and the 3D prototype keep their own keys).
 import * as THREE from 'three';
+import { caveDust } from '../world/caveLife';
 import { setGround } from '../world/ground';
 import { caveGround, ceilAt, heightAt, waterAt, zoneAt, SPOTS, RIVER, ZONES, type Zone } from './world/cavern';
 setGround(caveGround);
@@ -64,6 +65,8 @@ scene.add(hemi);
 
 const world = buildWorld();
 scene.add(world.root);
+const dust = caveDust(isTouch);
+scene.add(dust.mesh);
 // distance culling (visual only): objects past the fog are not drawn at all. Caves have no sky, so the
 // fog hides everything beyond it anyway; this keeps draw calls low on phones.
 const cullList: { o: THREE.Object3D; c: THREE.Vector3; r: number }[] = [];
@@ -71,7 +74,7 @@ const cullList: { o: THREE.Object3D; c: THREE.Vector3; r: number }[] = [];
   const box = new THREE.Box3(), sph = new THREE.Sphere();
   world.root.updateMatrixWorld(true);
   for (const o of world.root.children) {
-    if (o.name === 'floor' || o.name === 'ceiling') continue;
+    if (o.name === 'floor' || o.name === 'ceiling' || o.name === 'wall_crawler') continue;
     box.setFromObject(o);
     if (box.isEmpty()) continue;
     box.getBoundingSphere(sph);
@@ -1243,6 +1246,8 @@ function frame(now: number) {
   if (shake > 0) { shake -= dt; camera.position.x += (Math.random() - 0.5) * shake * 0.6; camera.position.y += (Math.random() - 0.5) * shake * 0.6; }
 
   // lights: the nearest spots to the camera get the pool
+  dust.update(T, camera.position);
+  world.updateWallLife(T, camera.position);
   for (const o of lightOrder) o.d = world.lights[o.i].pos.distanceToSquared(camera.position);
   lightOrder.sort((a, b) => a.d - b.d);
   for (let i = 0; i < POOL; i++) {

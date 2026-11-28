@@ -3,6 +3,7 @@
 // Shared systems (movement, collision, camera, input, character visuals, BOND effect) are used as they
 // are; everything chapter-2 specific lives under src3d/ch2/. Saves only under element118.ch2.*.
 import * as THREE from 'three';
+import { caveDust } from '../world/caveLife';
 import { registerChapter2Data, SMELT, SN } from './data';
 registerChapter2Data();
 import { setGround } from '../world/ground';
@@ -62,13 +63,15 @@ const atmosFog = new THREE.Color(), atmosSky = new THREE.Color(), atmosGround = 
 
 const world = buildWorld();
 scene.add(world.root);
+const dust = caveDust(isTouch);
+scene.add(dust.mesh);
 // distance culling (visual only): things past the fog are not drawn (keeps draw calls low on phones)
 const cullList: { o: THREE.Object3D; c: THREE.Vector3; r: number }[] = [];
 {
   const box = new THREE.Box3(), sph = new THREE.Sphere();
   world.root.updateMatrixWorld(true);
   for (const o of world.root.children) {
-    if (o.name === 'floor' || o.name === 'ceiling') continue;
+    if (o.name === 'floor' || o.name === 'ceiling' || o.name === 'wall_crawler') continue;
     box.setFromObject(o);
     if (box.isEmpty()) continue;
     box.getBoundingSphere(sph);
@@ -1112,6 +1115,8 @@ function frame(now: number) {
   if (camera.position.y > cy) camera.position.y = cy;
   if (shake > 0) { shake -= dt; camera.position.x += (Math.random() - 0.5) * shake * 0.6; camera.position.y += (Math.random() - 0.5) * shake * 0.6; }
 
+  dust.update(T, camera.position);
+  world.updateWallLife(T, camera.position);
   for (const o of lightOrder) o.d = world.lights[o.i].pos.distanceToSquared(camera.position);
   lightOrder.sort((a, b) => a.d - b.d);
   for (let i = 0; i < POOL; i++) { const L = world.lights[lightOrder[i].i]; pool[i].position.copy(L.pos); pool[i].color.setHex(L.color); pool[i].intensity = L.power * 9; }
