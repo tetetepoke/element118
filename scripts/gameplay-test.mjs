@@ -47,7 +47,17 @@ try {
     await page.locator('[data-id=cave_fang]').tap();
     await page.locator('[data-id=stick]').tap();
     await page.locator('[data-id=fiber]').tap();
-    await page.locator('#bagView canvas').waitFor();
+    const preview = page.locator('#bagView canvas');
+    await preview.waitFor();
+    await preview.scrollIntoViewIfNeeded();
+    const bounds = await preview.boundingBox();
+    const startingTilt = await evaluate((g) => g.viewerStats.tilt);
+    const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    await page.mouse.move(center.x, center.y);
+    await page.mouse.down();
+    await page.mouse.move(center.x + 20, center.y + 22, { steps: 2 });
+    await page.mouse.up();
+    assert.ok(Math.abs(await evaluate((g) => g.viewerStats.tilt) - startingTilt) > 0.1);
     await page.locator('#previewIn').tap();
     assert.match(await page.locator('.craft-stats').innerText(), /攻撃力\s+17/);
     await page.locator('#bMake').tap();

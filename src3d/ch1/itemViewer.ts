@@ -33,6 +33,7 @@ let frames = 0;
 let raf = 0;
 let dragging = false;
 let lastX = 0;
+let lastY = 0;
 let spinVel = 0;
 let host: HTMLElement | null = null;
 let iconEl: HTMLImageElement | null = null;
@@ -60,12 +61,20 @@ function ensureRenderer() {
   c.style.touchAction = 'none';
   c.style.display = 'block';
   c.style.width = c.style.height = '100%';
-  // one finger / mouse: turn left-right; auto-spin pauses while touched
-  c.addEventListener('pointerdown', (e) => { dragging = true; lastX = e.clientX; try { c.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ } e.preventDefault(); });
+  // A finger or mouse drag rotates the preview and pauses its idle spin.
+  c.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    try { c.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
+    e.preventDefault();
+  });
   c.addEventListener('pointermove', (e) => {
     if (!dragging) return;
     const dx = e.clientX - lastX;
+    if (disposablePreview) holder.rotation.x += (e.clientY - lastY) * 0.012;
     lastX = e.clientX;
+    lastY = e.clientY;
     holder.rotation.y += dx * 0.012;
     spinVel = dx * 0.012;
     e.preventDefault();
@@ -369,5 +378,6 @@ export const viewerStats = {
   get rendering() { return running; },
   get frames() { return frames; },
   get spin() { return holder.rotation.y; },
+  get tilt() { return holder.rotation.x; },
   get canvas() { return renderer?.domElement ?? null; },
 };
