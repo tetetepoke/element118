@@ -27,11 +27,13 @@ scene.add(holder);
 const models = new Map<string, Promise<THREE.Object3D | null>>();
 const thumbs = new Map<string, Promise<string | null>>();
 let current: THREE.Object3D | null = null;
+let disposablePreview = false;
 let running = false;
 let frames = 0;
 let raf = 0;
 let dragging = false;
 let lastX = 0;
+let lastY = 0;
 let spinVel = 0;
 let host: HTMLElement | null = null;
 let iconEl: HTMLImageElement | null = null;
@@ -59,12 +61,20 @@ function ensureRenderer() {
   c.style.touchAction = 'none';
   c.style.display = 'block';
   c.style.width = c.style.height = '100%';
-  // one finger / mouse: turn left-right; auto-spin pauses while touched
-  c.addEventListener('pointerdown', (e) => { dragging = true; lastX = e.clientX; try { c.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ } e.preventDefault(); });
+  // A finger or mouse drag rotates the preview and pauses its idle spin.
+  c.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    try { c.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
+    e.preventDefault();
+  });
   c.addEventListener('pointermove', (e) => {
     if (!dragging) return;
     const dx = e.clientX - lastX;
+    if (disposablePreview) holder.rotation.x += (e.clientY - lastY) * 0.012;
     lastX = e.clientX;
+    lastY = e.clientY;
     holder.rotation.y += dx * 0.012;
     spinVel = dx * 0.012;
     e.preventDefault();
@@ -73,6 +83,7 @@ function ensureRenderer() {
   c.addEventListener('pointerup', up);
   c.addEventListener('pointercancel', up);
   c.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  c.addEventListener('wheel', (e) => { zoomPreview(e.deltaY > 0 ? -1 : 1); e.preventDefault(); }, { passive: false });
   return renderer;
 }
 
@@ -259,25 +270,53 @@ export async function mount(box: HTMLElement, s: Subject, interactive = true) {
   return mountModel(box, s, interactive);
 }
 async function mountModel(box: HTMLElement, s: Subject, interactive: boolean) {
-  const r = ensureRenderer();
   const m = await loadModel(s);
   if (!m || !box.isConnected) return false;
+  showModel(box, m, interactive);
+  return true;
+}
+function removeModel() {
+  if (!current) return;
+  holder.remove(current);
+  if (disposablePreview) current.traverse((o) => {
+    if (o instanceof THREE.Mesh) {
+      o.geometry.dispose();
+      for (const material of Array.isArray(o.material) ? o.material : [o.material]) material.dispose();
+    }
+  });
+  current = null;
+  disposablePreview = false;
+}
+
+export function zoomPreview(direction: number) {
+  holder.scale.setScalar(THREE.MathUtils.clamp(holder.scale.x + direction * 0.14, 0.57, 1.26));
+}
+
+export function mountPreview(box: HTMLElement, model: THREE.Object3D) {
+  model.rotation.set(0, 0, -0.2);
+  showModel(box, fit(model), true, true);
+}
+
+function showModel(box: HTMLElement, m: THREE.Object3D, interactive: boolean, disposable = false) {
+  const r = ensureRenderer();
   iconEl?.remove();
   iconEl = null;
-  if (current) holder.remove(current);
+  removeModel();
   current = m;
+  disposablePreview = disposable;
   holder.add(m);
   holder.rotation.set(0.15, 0.4, 0);
+  holder.scale.setScalar(1);
   spinVel = 0;
   host = box;
   r.domElement.style.pointerEvents = interactive ? 'auto' : 'none';
   if (r.domElement.parentElement !== box) box.appendChild(r.domElement);
   if (!running) { running = true; loop(); }
-  return true;
 }
 
 /** stop rendering and take the canvas away (nothing is drawn while hidden) */
 export function unmount() {
+  removeModel();
   running = false;
   cancelAnimationFrame(raf);
   renderer?.domElement.remove();
@@ -339,5 +378,6 @@ export const viewerStats = {
   get rendering() { return running; },
   get frames() { return frames; },
   get spin() { return holder.rotation.y; },
+  get tilt() { return holder.rotation.x; },
   get canvas() { return renderer?.domElement ?? null; },
 };

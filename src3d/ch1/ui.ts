@@ -1,8 +1,9 @@
 // DOM user interface for chapter 1: dialogue, captions, area names, mission, toasts and panels.
 import { ELEMENTS, ITEMS, MATERIALS, type ElementSymbol } from './game/materials';
 import { scanView, elementLabel, discoveredCount, type KnowledgeState } from './game/knowledge';
-import { toolStats, toolName, type ToolDesign, type Tool } from './game/craft';
-import { mount, unmount, thumbnail, displayKind, type Subject } from './itemViewer';
+import { toolStats, toolName, toolMesh, partsNeeded, type ToolDesign, type Tool } from './game/craft';
+import { WEAPONS, PART_SLOTS, eligiblePart, type WeaponKind, type PartSlot } from '../gameplay/weaponTypes';
+import { mount, unmount, thumbnail, displayKind, mountPreview, zoomPreview, type Subject } from './itemViewer';
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -182,73 +183,96 @@ export interface BagCallbacks {
   inv: Record<string, number>;
   tool: Tool | null;
   canCreate: boolean;
-  onMake(d: ToolDesign): void;
+  onMake(d: ToolDesign): Tool | null;
   onEquip(i: number | null): void;
   tools: Tool[];
 }
-let design: ToolDesign = { handle: null, head: null, binding: null };
-let slotSel: keyof ToolDesign = 'handle';
+const emptyDesign = (kind?: WeaponKind): ToolDesign => ({ handle: null, head: null, binding: null, kind });
+const slotName: Record<PartSlot, string> = { head: '攻撃部分', handle: '柄', binding: '接合素材' };
+let design = emptyDesign();
+let slotSel: PartSlot = 'head';
 let bagSel: string | null = null;
 export function showBag(cb: BagCallbacks) {
   const render = () => {
-    const inv = cb.inv;
-    const ids = Object.entries(inv).filter(([, n]) => n > 0).map(([id]) => id);
+    unmount();
+    const ids = Object.keys(cb.inv).filter((id) => cb.inv[id] > 0 && ITEMS[id]);
     if (bagSel && !ids.includes(bagSel)) bagSel = null;
-    const itemsHtml = ids.map((id) => `<div class="card ${bagSel === id ? 'sel' : ''}" data-id="${id}"><div class="th" data-th="${id}"></div><div class="nm">${ITEMS[id].nameJa}</div><div class="n">×${inv[id]}</div></div>`).join('') || '<span class="note">まだ何も持っていない。</span>';
+    const needed = partsNeeded(design);
     const st = toolStats(design);
-    const nm = st ? toolName(design, st) : '';
-    const slot = (k: keyof ToolDesign, label: string) => `<div class="slot ${slotSel === k ? 'sel' : ''}" data-slot="${k}"><div class="k">${label}</div><div class="v">${design[k] ? ITEMS[design[k]!].nameJa : '―'}</div></div>`;
-    const selIt = bagSel ? ITEMS[bagSel] : null;
-    $('bagPanel').innerHTML = `<button class="small close" id="bagX">とじる</button><h2>持ち物</h2>
-      <div class="bagTop"><div class="grid">${itemsHtml}</div>
-      ${selIt ? `<div class="preview"><div class="pv" id="bagView"></div><div class="pn">${selIt.nameJa}</div><div class="note">${MATERIALS[selIt.mat]?.nameJa ?? ''}　×${inv[bagSel!]}</div>
-        ${displayKind({ kind: 'item', id: bagSel! }) === 'proc' || displayKind({ kind: 'item', id: bagSel! }) === 'model' ? '<div class="note">指・マウスで回せる</div>' : ''}
-        ${cb.canCreate ? '<button class="small" id="bToSlot">枠に入れる</button>' : ''}</div>` : ''}</div>
-      <div class="note">持っている道具：${cb.tools.length ? cb.tools.map((t, i) => `<span class="item" data-eq="${i}">${t.name}${cb.tool === t ? ' ✔' : ''}（のこり${t.uses}回）</span>`).join(' ') : 'なし'} <span class="item" data-eq="-1">素手にする</span></div>
-      ${cb.canCreate ? `<h2 style="margin-top:14px">CREATE　つくる</h2><div class="note">枠をえらんで、持ち物をえらび「枠に入れる」。形と材料から、道具の力がきまる（決まった作り方はない）。</div>
-      <div class="slots" style="margin-top:8px">${slot('handle', '柄（え）：長いもの')}${slot('head', '先端：たたく・切る・突く部分')}${slot('binding', 'しばる：あると長もち')}</div>
-      ${st ? `<div class="stats"><div>リーチ <b>${st.reach}</b>m</div><div>切る <b>${st.cut}</b></div><div>突く <b>${st.pierce}</b></div><div>たたく <b>${st.impact}</b></div><div>重さ <b>${st.weight}</b>kg</div><div>耐久 <b>${st.durability}</b>回</div></div>
-      <div class="note">できるもの：<b style="color:#fff">${nm}</b></div>` : '<div class="note">部品を入れると、力の見こみが出る。</div>'}
-      <button class="bigbtn" id="bMake" ${st ? '' : 'disabled'}>つくる</button> <button class="small" id="bClear">枠を空にする</button>` : ''}`;
+    const sufficient = Object.entries(needed).every(([id, n]) => (cb.inv[id] ?? 0) >= n);
+    const compatible = (slot: PartSlot, id: string) =>
+      eligiblePart(slot, id, design.kind) && (needed[id] ?? 0) - Number(design[slot] === id) < (cb.inv[id] ?? 0);
+    const items = ids.map((id) => `<button type="button" draggable="true" class="card ${bagSel === id ? 'sel' : ''} ${cb.canCreate && !compatible(slotSel, id) ? 'incompatible' : ''}" data-id="${id}"><span class="th" data-th="${id}"></span><span class="nm">${ITEMS[id].nameJa}</span><span class="n">×${cb.inv[id]}</span></button>`).join('') || '<span class="note">まだ何も持っていない</span>';
+    const slots = PART_SLOTS.map((slot) => `<button type="button" class="slot ${slotSel === slot ? 'sel' : ''}" data-slot="${slot}"><span class="k">${slotName[slot]}</span><span class="v">${design[slot] ? ITEMS[design[slot]!].nameJa : '選ぶ'}</span></button>`).join('');
+    const selected = bagSel ? ITEMS[bagSel] : null;
+    const canPreview = cb.canCreate && (!!design.kind || PART_SLOTS.some((slot) => design[slot] !== null));
+    $('bagPanel').innerHTML = `<button class="small close" id="bagX">とじる</button><h2>${cb.canCreate ? '持ち物・CREATE' : '持ち物'}</h2>
+      ${cb.canCreate ? `<label class="craft-type">種類 <select id="craftKind"><option value="">工具（自由に組み合わせる）</option>${Object.entries(WEAPONS).map(([kind, def]) => `<option value="${kind}" ${design.kind === kind ? 'selected' : ''}>${def.label}</option>`).join('')}</select></label>` : ''}
+      <div class="craft-layout"><section class="craft-supplies"><h3>所持素材</h3><div class="grid">${items}</div></section>
+      <section class="craft-preview"><h3>${canPreview ? '製作プレビュー' : selected?.nameJa ?? '3Dプレビュー'}</h3><div id="bagView" class="pv"></div><div class="craft-zoom"><button class="small" id="previewOut" aria-label="縮小">−</button><button class="small" id="previewIn" aria-label="拡大">＋</button></div>
+      ${cb.canCreate ? `<div class="slots">${slots}</div><button class="small" id="bToSlot" ${bagSel && compatible(slotSel, bagSel) ? '' : 'disabled'}>選んだ素材を${slotName[slotSel]}に入れる</button>` : ''}</section>
+      <section class="craft-stats"><h3>性能と必要素材</h3>
+      ${st ? `<strong>${toolName(design, st)}</strong><dl><dt>攻撃力</dt><dd>${st.attack}</dd><dt>攻撃速度</dt><dd>${st.attackSpeed}</dd><dt>耐久</dt><dd>${st.durability}回</dd><dt>重量</dt><dd>${st.weight} kg</dd><dt>リーチ</dt><dd>${st.reach} m</dd><dt>破壊能力</dt><dd>切 ${st.cut}／突 ${st.pierce}／打 ${st.impact}</dd></dl>${st.effect ? `<p>${st.effect}</p>` : ''}` : '<p class="note">部品を組み合わせると性能が出ます。</p>'}
+      <ul>${Object.entries(needed).map(([id, n]) => `<li class="${(cb.inv[id] ?? 0) < n ? 'shortage' : ''}">${ITEMS[id].nameJa} ${n} / ${cb.inv[id] ?? 0}</li>`).join('')}</ul>
+      ${cb.canCreate ? `<button class="bigbtn" id="bMake" ${st && sufficient ? '' : 'disabled'}>つくる</button> <button class="small" id="bClear">枠を空にする</button>` : ''}</section></div>
+      <div class="note">装備 ${cb.tools.map((t, i) => `<button class="item" data-eq="${i}">${t.name}${cb.tool === t ? ' ✔' : ''}（${t.uses}回）</button>`).join(' ')} <button class="item" data-eq="-1">素手</button></div>`;
+    const panel = $('bagPanel');
+    const preview = $('bagView');
     $('bagX').onclick = () => ui.close('bagWrap');
-    // thumbnails: rendered once per item, then reused
-    void (async () => {
-      for (const id of ids) {
-        const url = await thumbnail({ kind: 'item', id });
-        const th = document.querySelector<HTMLElement>(`#bagPanel [data-th="${id}"]`);
-        if (th && url) th.innerHTML = `<img src="${url}" alt="">`;
-        else if (th) th.textContent = ITEMS[id].nameJa.slice(0, 2);
-      }
-      if (bagSel) { const v = document.getElementById('bagView'); if (v) void mount(v, { kind: 'item', id: bagSel }, true); }
-    })();
-    document.querySelectorAll<HTMLElement>('#bagPanel .slot').forEach((el) => (el.onclick = () => { const k = el.dataset.slot as keyof ToolDesign; if (design[k]) design[k] = null; slotSel = k; render(); }));
-    document.querySelectorAll<HTMLElement>('#bagPanel .card[data-id]').forEach((el) => (el.onclick = () => { bagSel = el.dataset.id!; render(); }));
-    const ts = document.getElementById('bToSlot');
-    if (ts) ts.onclick = () => {
-      const id = bagSel!;
-      const used = Object.values(design).filter((v) => v === id).length;
-      if (used >= (cb.inv[id] ?? 0)) return;
-      if (slotSel === 'binding' && !ITEMS[id].binding) return;
-      design[slotSel] = id;
-      slotSel = slotSel === 'handle' ? 'head' : 'binding';
+    if (canPreview) mountPreview(preview, toolMesh(design));
+    else if (selected) void mount(preview, { kind: 'item', id: selected.id }, true);
+    $('previewOut').onclick = () => zoomPreview(-1);
+    $('previewIn').onclick = () => zoomPreview(1);
+    const chooseKind = document.getElementById('craftKind') as HTMLSelectElement | null;
+    if (chooseKind) chooseKind.onchange = () => {
+      design = emptyDesign(chooseKind.value ? chooseKind.value as WeaponKind : undefined);
+      slotSel = 'head';
       render();
     };
-    document.querySelectorAll<HTMLElement>('#bagPanel .item[data-eq]').forEach((el) => (el.onclick = () => { const i = Number(el.dataset.eq); cb.onEquip(i < 0 ? null : i); render(); }));
+    const assign = (slot: PartSlot, id: string) => {
+      if (!compatible(slot, id)) return;
+      design[slot] = id;
+      slotSel = PART_SLOTS.find((part) => !design[part]) ?? slot;
+      render();
+    };
+    panel.querySelectorAll<HTMLElement>('.slot').forEach((button) => {
+      const slot = button.dataset.slot as PartSlot;
+      button.onclick = () => { slotSel = slot; render(); };
+      button.ondragover = (event) => event.preventDefault();
+      button.ondrop = (event) => { event.preventDefault(); assign(slot, event.dataTransfer?.getData('text/plain') ?? ''); };
+    });
+    panel.querySelectorAll<HTMLElement>('.card[data-id]').forEach((el) => {
+      el.onclick = () => {
+        bagSel = el.dataset.id!;
+        if (cb.canCreate && design.kind && compatible(slotSel, bagSel)) assign(slotSel, bagSel);
+        else render();
+      };
+      el.ondragstart = (event) => event.dataTransfer?.setData('text/plain', el.dataset.id!);
+      const id = el.dataset.id!;
+      const th = el.querySelector<HTMLElement>('.th')!;
+      void thumbnail({ kind: 'item', id }).then((url) => {
+        if (!el.isConnected) return;
+        if (url) { const icon = document.createElement('img'); icon.src = url; icon.alt = ''; th.replaceChildren(icon); }
+        else th.textContent = ITEMS[id].nameJa.slice(0, 2);
+      });
+    });
+    const to = document.getElementById('bToSlot');
+    if (to) to.onclick = () => { if (bagSel) assign(slotSel, bagSel); };
+    panel.querySelectorAll<HTMLElement>('[data-eq]').forEach((el) => (el.onclick = () => { const i = Number(el.dataset.eq); cb.onEquip(i < 0 ? null : i); cb.tool = i < 0 ? null : cb.tools[i]; render(); }));
     const mk = document.getElementById('bMake');
-    if (mk) mk.onclick = () => { cb.onMake({ ...design }); design = { handle: null, head: null, binding: null }; slotSel = 'handle'; render(); };
+    if (mk) mk.onclick = () => { const made = cb.onMake({ ...design }); if (!made) return; cb.tool = made; design = emptyDesign(design.kind); slotSel = 'head'; render(); };
     const cl = document.getElementById('bClear');
-    if (cl) cl.onclick = () => { design = { handle: null, head: null, binding: null }; slotSel = 'handle'; render(); };
+    if (cl) cl.onclick = () => { design = emptyDesign(design.kind); slotSel = 'head'; render(); };
   };
-  unmount();
   render();
   ui.open('bagWrap');
 }
 
 // ── codex ──
 let codexSel: ElementSymbol | null = null;
-export function showCodex(k: KnowledgeState, notes: string[]) {
+export function showCodex(k: KnowledgeState, notes: string[], wildlifeMaterials: string[] = []) {
   const els = (Object.keys(ELEMENTS) as ElementSymbol[]).filter((s) => (k.el[s] ?? 0) > 0);
-  const mats = k.scanned.map((id) => MATERIALS[id]).filter(Boolean);
+  const mats = [...new Set([...k.scanned, ...wildlifeMaterials])].map((id) => MATERIALS[id]).filter(Boolean);
   if (codexSel && (k.el[codexSel] ?? 0) < 2) codexSel = null;
   const sel = codexSel ? ELEMENTS[codexSel] : null;
   $('codexPanel').innerHTML = `<button class="small close" id="codexX">とじる</button><h2>図鑑</h2><div class="kind">DISCOVERED ${discoveredCount(k)} / 118</div>
@@ -257,11 +281,11 @@ export function showCodex(k: KnowledgeState, notes: string[]) {
       <div class="fic"><h3>ゲームの中の能力（フィクション）</h3><div>${sel.ability ?? 'まだわからない'}</div></div>
       <div class="note">3D はゲーム上のイメージ表現です（本物の原子がこの形・色をしているわけではありません）。</div></div></div>` : ''}
     <div class="cols"><div class="col real"><h3>元素</h3>${els.length ? els.map((s) => `<div style="margin:4px 0" ${(k.el[s] ?? 0) >= 2 ? `class="elrow" data-el="${s}"` : ''}><span class="el l${k.el[s]}">${elementLabel(k, s)}</span> ${(k.el[s] ?? 0) >= 2 ? `<span style="font-size:13px">${ELEMENTS[s].fact}</span> <b style="color:#8fc8ff">▶ 見る</b>` : '<span class="note">まだよくわからない</span>'}</div>`).join('') : '<div class="note">まだ何もわからない。</div>'}</div>
-    <div class="col"><h3>スキャンした物</h3><ul>${mats.map((m) => `<li>${m.mystery ? m.nameJa + '（UNKNOWN）' : m.nameJa}</li>`).join('') || '<li>なし</li>'}</ul>
+    <div class="col"><h3>見つけた物</h3><ul>${mats.map((m) => `<li>${m.mystery ? m.nameJa + '（UNKNOWN）' : m.nameJa + (m.id.startsWith('cave_') ? '（架空生物の素材）' : '')}</li>`).join('') || '<li>なし</li>'}</ul>
     <h3 style="margin-top:12px">気になること</h3><ul>${notes.map((n) => `<li>${n}</li>`).join('') || '<li>……</li>'}</ul></div></div>
     <div class="note">白い字＝本物の科学。緑の字＝このゲームの中だけの能力・設定（フィクション）。</div>`;
   $('codexX').onclick = () => ui.close('codexWrap');
-  document.querySelectorAll<HTMLElement>('#codexPanel .elrow').forEach((el) => (el.onclick = () => { codexSel = el.dataset.el as ElementSymbol; showCodex(k, notes); }));
+  document.querySelectorAll<HTMLElement>('#codexPanel .elrow').forEach((el) => (el.onclick = () => { codexSel = el.dataset.el as ElementSymbol; showCodex(k, notes, wildlifeMaterials); }));
   unmount();
   if (sel) void mount($('codexView'), { kind: 'element', symbol: sel.symbol }, true);
   ui.open('codexWrap');

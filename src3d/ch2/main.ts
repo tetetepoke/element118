@@ -3,6 +3,12 @@
 // Shared systems (movement, collision, camera, input, character visuals, BOND effect) are used as they
 // are; everything chapter-2 specific lives under src3d/ch2/. Saves only under element118.ch2.*.
 import * as THREE from 'three';
+import '../gameplay/gameplay.css';
+import { explorationMap, type MapProgress } from '../gameplay/explorationMap';
+import { encounters, type EncounterSave } from '../gameplay/encounters';
+import { registerWildlifeMaterials } from '../gameplay/wildlifeData';
+import { CHAPTER2_LAYERS, CHAPTER2_ENCOUNTERS, location as mapLocation } from '../gameplay/chapterSites';
+registerWildlifeMaterials();
 import { caveDust } from '../world/caveLife';
 import { registerChapter2Data, SMELT, SN } from './data';
 registerChapter2Data();
@@ -24,7 +30,7 @@ import { viewerStats } from '../ch1/itemViewer';
 import { sfx, startAudio } from '../ch1/audio';
 import { ITEMS, MATERIALS, ELEMENTS, type ElementSymbol } from '../ch1/game/materials';
 import { newKnowledge, noteScan, level, type KnowledgeState } from '../ch1/game/knowledge';
-import { makeTool, toolMesh, type Tool, type ToolDesign } from '../ch1/game/craft';
+import { makeTool, toolMesh, partsNeeded, craftFromInventory, adjustWeaponCarry, type Tool, type ToolDesign } from '../ch1/game/craft';
 import { canBreak, canHarvest, HANDS, STAT_JA, type Power } from '../ch1/game/interact';
 import { ProceduralCupra, buildCuOverlay } from './world/actors';
 
@@ -128,7 +134,8 @@ const blob = (() => {
 type Who = 'silica' | 'cupra';
 type Mode = 'none' | 'merged' | 'follow' | 'wait';
 type Form = 'normal' | 'sic' | 'cu';
-interface Save {
+interface Save extends EncounterSave {
+  exploration?: MapProgress;
   v: 1;
   flags: Record<string, boolean>;
   inv: Record<string, number>;
@@ -193,7 +200,12 @@ let equipped: Tool | null = null;
 let handMesh: THREE.Object3D | null = null;
 function equip(t: Tool | null) {
   equipped = t;
-  if (handMesh) carbon.rightHand.remove(handMesh);
+  if (handMesh) {
+    carbon.rightHand.remove(handMesh);
+    handMesh.traverse((o) => {
+      if (o instanceof THREE.Mesh) { o.geometry.dispose(); o.material.dispose(); }
+    });
+  }
   handMesh = null;
   if (t) { handMesh = toolMesh(t.design); carbon.rightHand.add(handMesh); }
   const tag = $('toolTag');
@@ -214,11 +226,70 @@ function useTool() {
   if (equipped.uses <= 0) {
     const t = equipped;
     ui.toast(`${t.name}がこわれた。部品はもどってきた。`);
-    for (const id of Object.values(t.design)) if (id && !ITEMS[id].binding) addItem(id);
+    for (const [id, count] of Object.entries(partsNeeded(t.design))) if (!ITEMS[id].binding) addItem(id, count);
     tools.splice(tools.indexOf(t), 1);
     equip(null);
-  } else equip(equipped);
+  } else $('toolTag').textContent = `${equipped.name}（${equipped.uses}回）`;
 }
+
+const landmarks = [
+  mapLocation('昇降機', SPOTS.lift), mapLocation('カンテラ村', SPOTS.village), mapLocation('炭焼き窯', SPOTS.kiln),
+  mapLocation('古い炉', SPOTS.furnace), mapLocation('記録の間', SPOTS.plate), mapLocation('発電所', SPOTS.panels),
+];
+function mapObjective() {
+  if (!flag('lift_seen')) return mapLocation('昇降機', SPOTS.lift);
+  if (!flag('village')) return mapLocation('カンテラ村', SPOTS.village);
+  if (!flag('chief')) return mapLocation('坑長', SPOTS.chief);
+  if (!flag('smelter')) return mapLocation('炉番', SPOTS.smelter);
+  if (!flag('copper') && !S.inv.malachite) return mapLocation('緑の坑', SPOTS.malachite);
+  if (!flag('copper') && !S.inv.charcoal) return mapLocation('炭焼き窯', SPOTS.kiln);
+  if (!flag('wire')) return mapLocation('古い炉', SPOTS.furnace);
+  if (!flag('legend')) return mapLocation('記録守', SPOTS.keeper);
+  if (!flag('cupra')) return mapLocation('緑青の洞', SPOTS.geode);
+  if (!flag('record')) return mapLocation('記録の間', SPOTS.plate);
+  if (!flag('power')) return mapLocation('発電所', S.gaps.gapA ? SPOTS.gapB : SPOTS.gapA);
+  if (!flag('ending')) return mapLocation('昇降機', SPOTS.lift);
+}
+const caveMap = explorationMap(mineGround, world.colliders, CHAPTER2_LAYERS, landmarks);
+const combat = encounters({
+  scene, ground: mineGround, colliders: world.colliders, sites: CHAPTER2_ENCOUNTERS,
+  state: () => S, pos: player.pos, facing: () => player.facing,
+  aim: (yaw) => { player.facing = yaw; carbon.root.rotation.y = yaw; },
+  form: () => S.form, tool: () => equipped, grip: () => carbon.rightHand, held: () => handMesh,
+  animation: (duration) => { carbon.playAction('combat', duration); },
+  loot(item) {
+    addItem(item);
+    const material = ITEMS[item].mat;
+    const discovered = (S.wildlifeMaterials ??= []);
+    if (!discovered.includes(material)) discovered.push(material);
+    sfx.pick();
+    void gotItem(item);
+  },
+  wear: useTool,
+  retreat() {
+    const start = mineGround.spawn;
+    player.teleport(start.x, start.z);
+    ui.toast('力尽き、章の入口まで戻った。');
+    persist();
+  },
+  save: persist,
+});
+const attackButton = document.createElement('button');
+attackButton.id = 'bAttack';
+attackButton.type = 'button';
+attackButton.textContent = '攻撃';
+attackButton.ariaLabel = '攻撃（G／ZR）';
+attackButton.hidden = true;
+document.body.append(attackButton);
+bindAction(attackButton, 'ActionR');
+function giveMap() {
+  if (S.exploration) return false;
+  S.exploration = { visited: [] };
+  persist();
+  ui.toast('地下地図を手に入れた！　右上から開ける', true, 4200);
+  return true;
+}
+window.addEventListener('pagehide', () => { if (flag('start') && !cutscene && !fx.active) persist(); });
 
 // ── missions ──
 function updateMission() {
@@ -431,6 +502,9 @@ async function keeperTalk() {
 async function npcTalk(id: string) {
   const n = world.npcs.find((k) => k.id === id);
   n?.lookAt(P());
+  if (['chief', 'miner_a', 'miner_b'].includes(id) && giveMap()) {
+    await ui.say('坑夫', '坑道の地図を持っていきな。通った道には印がつく。足元には気をつけろよ。');
+  }
   if (id === 'chief') return chiefTalk();
   if (id === 'smelter') return smelterTalk();
   if (id === 'keeper') return keeperTalk();
@@ -780,8 +854,9 @@ function onForm() {
 
 // ══════════ actions ══════════
 async function onAction() {
-  if (cutscene || fx.active || ui.busy() || choiceOpen) return;
+  if (caveMap.open || cutscene || fx.active || ui.busy() || choiceOpen) return;
   const t = nearest(isActionable);
+  if (!t && combat.collect()) return;
   // a waiting partner close by: "come along"
   for (const w of ['silica', 'cupra'] as Who[]) {
     if (S.partners[w] === 'wait' && vis(w).root.position.distanceTo(P()) < 2.2 && (!t || t.kind !== 'gap')) {
@@ -850,20 +925,16 @@ function onScan() {
   persist();
 }
 function makeFromDesign(d: ToolDesign) {
-  const need: Record<string, number> = {};
-  for (const id of Object.values(d)) if (id) need[id] = (need[id] ?? 0) + 1;
-  if (Object.entries(need).some(([id, n]) => (S.inv[id] ?? 0) < n)) { ui.toast('部品が足りない。'); return; }
-  const t = makeTool(d);
-  if (!t) return;
-  for (const id of Object.values(d)) if (id) S.inv[id]--;
-  tools.push(t);
+  const t = craftFromInventory(d, S.inv, tools);
+  if (!t) { ui.toast('部品が足りないか、組み合わせが合わない。'); return null; }
   equip(t);
   sfx.chime(true);
   ui.toast(`CREATE　${t.name}　（切る ${t.stats.cut} / 突く ${t.stats.pierce} / たたく ${t.stats.impact}）`, true, 4000);
   persist();
+  return t;
 }
 function openBag() {
-  if (cutscene || fx.active) return;
+  if (caveMap.open || cutscene || fx.active) return;
   showBag({ inv: S.inv, tool: equipped, canCreate: true, tools, onMake: makeFromDesign, onEquip: (i) => equip(i === null ? null : tools[i]) });
 }
 const shards: { m: THREE.Object3D; t: number }[] = [];
@@ -894,8 +965,14 @@ function triggers(dt: number) {
     if (d > 0.95 || Math.abs(p.y - bp.y) > 1.5) continue;
     if (S.form === 'sic') { bp.x -= (dx / (d || 1)) * 0.6; bp.z -= (dz / (d || 1)) * 0.6; continue; }
     if (cutscene) continue;
-    player.pos.x += (dx / (d || 1)) * (1.0 - d + 0.3);
-    player.pos.z += (dz / (d || 1)) * (1.0 - d + 0.3);
+    const next = { x: p.x + (dx / (d || 1)) * (1.3 - d), z: p.z + (dz / (d || 1)) * (1.3 - d) };
+    const floor = heightAt(next.x, next.z);
+    if (Math.abs(floor - p.y) < 0.6 &&
+        world.colliders.penetration(next.x, next.z, p.y, MOVE.radius, MOVE.height, 0) < 0.02 &&
+        world.colliders.sweep(p.x, p.y + 0.42, p.z, next.x, p.y + 0.42, next.z, MOVE.radius) > 0.999) {
+      p.x = next.x;
+      p.z = next.z;
+    }
     if (bumpT <= 0) { bumpT = 3; sfx.clank(1.4); ui.toast(S.form === 'normal' ? 'ロクショウムシにはじき返された！　（かたい体なら……？）' : 'ロクショウムシにはじき返された！'); }
   }
   if (lureT > 0) { lureT -= dt; if (lureT <= 0) for (const b of world.bugs) b.lure = null; }
@@ -950,7 +1027,7 @@ bindAction($('bForm'), 'Form');
 let runToggle = false;
 bindButton($('bRun'), () => { runToggle = !runToggle; $('bRun').classList.toggle('on', runToggle); });
 $('bBagTop').onclick = () => openBag();
-$('bCodex').onclick = () => showCodex(S.k, S.notes);
+$('bCodex').onclick = () => showCodex(S.k, S.notes, S.wildlifeMaterials);
 $('bSettings').onclick = () => openSettings();
 const PANELS = ['scanWrap', 'bagWrap', 'codexWrap', 'settingsWrap', 'choiceWrap'];
 const closeAll = () => { PANELS.forEach((id) => ui.close(id)); choiceOpen = false; };
@@ -1040,7 +1117,14 @@ function frame(now: number) {
   last = now; T += dt;
   fpsA.push(dt); if (fpsA.length > 30) fpsA.shift();
   pollInput(dt);
+  if (caveMap.open) {
+    if (input.menu || input.codex) caveMap.close();
+    endFrame();
+    requestAnimationFrame(frame);
+    return;
+  }
   if (runToggle) input.run = true;
+  if (input.actionR && !cutscene && !fx.active && !ui.busy() && !choiceOpen) combat.attack();
   if (gotIsOpen() && (input.action || input.jump)) { dismissGot(); input.action = input.jump = false; }
   if (input.action || (input.jump && ui.sayOpen)) { if (ui.sayOpen) { ui.advance(); input.jump = false; } else void onAction(); }
   if (!cutscene && !ui.sayOpen) {
@@ -1049,7 +1133,7 @@ function frame(now: number) {
     if (input.toolPrev) cycleTool(-1);
     if (input.toolNext) cycleTool(1);
     if (input.menu) { if (ui.busy() || choiceOpen) closeAll(); else openBag(); }
-    if (input.codex) { if (ui.busy() || choiceOpen) closeAll(); else showCodex(S.k, S.notes); }
+    if (input.codex) { if (ui.busy() || choiceOpen) closeAll(); else showCodex(S.k, S.notes, S.wildlifeMaterials); }
   }
   const busy = ui.busy() || choiceOpen;
   if (!cutscene && !busy) cam.addLook(input.lookX, input.lookY);
@@ -1063,6 +1147,11 @@ function frame(now: number) {
     if (!fx.frozen) for (let i = 0; i < steps; i++) { player.update(dt / steps, input, forward, right); if (i === 0) input.jump = false; }
   }
   if (!fx.frozen) carbon.update(dt);
+  adjustWeaponCarry(handMesh, heightAt);
+  const combatPaused = cutscene || fx.active || ui.busy() || choiceOpen;
+  combat.update(dt, combatPaused);
+  attackButton.hidden = combatPaused || !combat.nearby();
+  caveMap.update(dt, S.exploration, player.pos.x, player.pos.z, player.facing, mapObjective());
   triggers(dt);
   updatePartners(dt);
 
@@ -1143,8 +1232,9 @@ function frame(now: number) {
   const scanHint = scanT && dev !== 'touch' ? `${keyHint('Scan')}スキャン` : '';
   const pr = t ? `${keyHint('Interact')}${actionLabel(t)}` : null;
   ui.prompt(pr ? pr + (scanHint ? '　　' + scanHint : '') : scanHint || null);
-  $('bAct').classList.toggle('hide', !t);
-  $('bAct').textContent = t ? actionLabel(t).replace(/（.*$/, '') : 'E';
+  const canCollect = !t && !combatPaused && combat.hasLoot();
+  $('bAct').classList.toggle('hide', !t && !canCollect);
+  $('bAct').textContent = t ? actionLabel(t).replace(/（.*$/, '') : canCollect ? '拾う' : 'E';
   $('bScan').classList.remove('hide');
   const canForm = S.form !== 'normal' || (['silica', 'cupra'] as Who[]).some((w) => S.partners[w] === 'follow' || S.partners[w] === 'wait');
   $('bForm').classList.toggle('hide', !canForm);
@@ -1191,7 +1281,7 @@ $('bCont').onclick = () => void begin(true);
 requestAnimationFrame(frame);
 
 (window as unknown as { __ch2: unknown }).__ch2 = {
-  get S() { return S; }, player, world, cam, silica, cupra, carbon, fx, ui, zones: ZONES, colDebug, spots: SPOTS,
+  get S() { return S; }, caveMap, combat, player, world, cam, silica, cupra, carbon, fx, ui, zones: ZONES, colDebug, spots: SPOTS,
   begin, onAction, onScan, onForm, makeFromDesign, equip, input, viewerStats, gotIsOpen, dismissGot, gotItem, openBag, smelt, useGap, gapConducted,
   get tools() { return tools; }, get choiceOpen() { return choiceOpen; }, closeAll, heightAt, ceilAt, zoneAt, persist,
   get cutscene() { return cutscene; }, level: (s: string) => level(S.k, s as ElementSymbol),

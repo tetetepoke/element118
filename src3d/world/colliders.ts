@@ -298,11 +298,11 @@ export class ColliderWorld {
   }
 
   /** Does the segment pass through a solid (for the camera)? Returns the free fraction 0..1. */
-  sweep(ax: number, ay: number, az: number, bx: number, by: number, bz: number, margin: number) {
+  sweep(ax: number, ay: number, az: number, bx: number, by: number, bz: number, margin: number, solid = (c: Collider) => !c.cameraIgnore) {
     const len = Math.hypot(bx - ax, by - ay, bz - az);
     // samples closer than the camera ball's radius, so nothing thinner than the ball slips between them
     const steps = Math.max(8, Math.min(64, Math.ceil(len / Math.max(0.08, margin * 0.6))));
-    const near = this.near(Math.min(ax, bx) - margin, Math.max(ax, bx) + margin, Math.min(az, bz) - margin, Math.max(az, bz) + margin, []).filter((c) => c.enabled && !c.cameraIgnore);
+    const near = this.near(Math.min(ax, bx) - margin, Math.max(ax, bx) + margin, Math.min(az, bz) - margin, Math.max(az, bz) + margin, []).filter((c) => c.enabled && solid(c));
     for (let i = 1; i <= steps; i++) {
       const t = i / steps;
       const x = ax + (bx - ax) * t, y = ay + (by - ay) * t, z = az + (bz - az) * t;

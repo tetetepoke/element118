@@ -2,6 +2,12 @@
 // The playable first chapter, built on the 3D prototype's movement, camera and character code.
 // Saves only under element118.ch1.* (the 2D game and the 3D prototype keep their own keys).
 import * as THREE from 'three';
+import '../gameplay/gameplay.css';
+import { explorationMap, type MapProgress } from '../gameplay/explorationMap';
+import { encounters, type EncounterSave } from '../gameplay/encounters';
+import { registerWildlifeMaterials } from '../gameplay/wildlifeData';
+import { CHAPTER1_LAYERS, CHAPTER1_ENCOUNTERS, location as mapLocation } from '../gameplay/chapterSites';
+registerWildlifeMaterials();
 import { caveDust } from '../world/caveLife';
 import { setGround } from '../world/ground';
 import { caveGround, ceilAt, heightAt, waterAt, zoneAt, SPOTS, RIVER, ZONES, type Zone } from './world/cavern';
@@ -23,7 +29,7 @@ import { viewerStats } from './itemViewer';
 import { sfx, startAudio } from './audio';
 import { ITEMS, MATERIALS, ELEMENTS, type ElementSymbol } from './game/materials';
 import { newKnowledge, unlockScan, noteScan, level, type KnowledgeState } from './game/knowledge';
-import { makeTool, toolMesh, type Tool, type ToolDesign } from './game/craft';
+import { makeTool, toolMesh, partsNeeded, craftFromInventory, adjustWeaponCarry, type Tool, type ToolDesign } from './game/craft';
 import { canBreak, canHarvest, HANDS, STAT_JA, type Power } from './game/interact';
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -132,7 +138,8 @@ const blob = (() => {
 
 // ── game state (saved) ──
 type PartnerMode = 'none' | 'merged' | 'follow' | 'wait';
-interface Save {
+interface Save extends EncounterSave {
+  exploration?: MapProgress;
   v: 1;
   flags: Record<string, boolean>;
   inv: Record<string, number>;
@@ -209,7 +216,12 @@ let equipped: Tool | null = null;
 let handMesh: THREE.Object3D | null = null;
 function equip(t: Tool | null) {
   equipped = t;
-  if (handMesh) carbon.rightHand.remove(handMesh);
+  if (handMesh) {
+    carbon.rightHand.remove(handMesh);
+    handMesh.traverse((o) => {
+      if (o instanceof THREE.Mesh) { o.geometry.dispose(); o.material.dispose(); }
+    });
+  }
   handMesh = null;
   if (t) {
     handMesh = toolMesh(t.design);
@@ -237,11 +249,68 @@ function useTool() {
   if (equipped.uses <= 0) {
     const t = equipped;
     ui.toast(`${t.name}がこわれた。部品はもどってきた。`);
-    for (const id of Object.values(t.design)) if (id && !ITEMS[id].binding) addItem(id);
+    for (const [id, count] of Object.entries(partsNeeded(t.design))) if (!ITEMS[id].binding) addItem(id, count);
     tools.splice(tools.indexOf(t), 1);
     equip(null);
-  } else equip(equipped);
+  } else $('toolTag').textContent = `${equipped.name}（${equipped.uses}回）`;
 }
+
+const landmarks = [
+  mapLocation('アトミア', SPOTS.plaza), mapLocation('研究所', SPOTS.lab), mapLocation('ハコビの渡し場', SPOTS.riverDock),
+  mapLocation('鉱物層', SPOTS.silica), mapLocation('二つの台座', SPOTS.plateA), mapLocation('上層門', SPOTS.gateStop),
+];
+function mapObjective() {
+  if (!flag('city_seen')) return mapLocation('廃棄区の出口', SPOTS.exitHeap);
+  if (!flag('city_talk')) return mapLocation('アトミアの広場', SPOTS.plaza);
+  if (!flag('elder')) return mapLocation('根のそばの老人', SPOTS.elder);
+  if (!S.k.create || !flag('made_tool')) return mapLocation('研究所', SPOTS.lab);
+  if (!flag('river_crossed')) return mapLocation('地下水脈', SPOTS.riverDock);
+  if (!S.k.bond) return mapLocation('鉱物層の奥', SPOTS.silica);
+  if (!flag('hard_wall')) return mapLocation('硬い岩盤', SPOTS.hardWall);
+  if (!flag('door_open')) return mapLocation('二つの台座', SPOTS.plateA);
+  if (!flag('reveal')) return mapLocation('結晶層', SPOTS.reveal);
+  if (!flag('ending')) return mapLocation('上層門', SPOTS.gateStop);
+}
+const caveMap = explorationMap(caveGround, world.colliders, CHAPTER1_LAYERS, landmarks);
+const combat = encounters({
+  scene, ground: caveGround, colliders: world.colliders, sites: CHAPTER1_ENCOUNTERS,
+  state: () => S, pos: player.pos, facing: () => player.facing,
+  aim: (yaw) => { player.facing = yaw; carbon.root.rotation.y = yaw; },
+  form: () => S.form, tool: () => equipped, grip: () => carbon.rightHand, held: () => handMesh,
+  animation: (duration) => { carbon.playAction('combat', duration); },
+  loot(item) {
+    addItem(item);
+    const material = ITEMS[item].mat;
+    const discovered = (S.wildlifeMaterials ??= []);
+    if (!discovered.includes(material)) discovered.push(material);
+    sfx.pick();
+    void gotItem(item);
+  },
+  wear: useTool,
+  retreat() {
+    const start = caveGround.spawn;
+    player.teleport(start.x, start.z);
+    ui.toast('力尽き、章の入口まで戻った。');
+    persist();
+  },
+  save: persist,
+});
+const attackButton = document.createElement('button');
+attackButton.id = 'bAttack';
+attackButton.type = 'button';
+attackButton.textContent = '攻撃';
+attackButton.ariaLabel = '攻撃（G／ZR）';
+attackButton.hidden = true;
+document.body.append(attackButton);
+bindAction(attackButton, 'ActionR');
+function giveMap() {
+  if (S.exploration) return false;
+  S.exploration = { visited: [] };
+  persist();
+  ui.toast('地下地図を手に入れた！　右上から開ける', true, 4200);
+  return true;
+}
+window.addEventListener('pagehide', () => { if (flag('wake') && !cutscene && !fx.active) persist(); });
 
 // ── missions ──
 function updateMission() {
@@ -529,6 +598,9 @@ async function researcherTalk() {
 async function npcTalk(id: string) {
   const n = world.npcs.find((k) => k.id === id);
   n?.lookAt(player.pos);
+  if (['res_a', 'res_b', 'res_c', 'res_d', 'vendor'].includes(id) && giveMap()) {
+    await ui.say('住民', '地下道の地図だよ。歩いたところには印がつく。迷ったときは開いてみな。');
+  }
   const lines: Record<string, [string, string][]> = {
     worker_a: [['作業員', '上から落ちてきた物は、全部この第七廃棄区に集まる。'], ['作業員', '出口は北だ。ゴミの山は、よじ登れば越えられる。']],
     worker_b: [['もう一人の作業員', '「また」ってのは……いや、何でもない。昔の話だ。']],
@@ -760,8 +832,9 @@ async function fragment() {
 
 // ── actions ──
 async function onAction() {
-  if (cutscene || fx.active || ui.busy()) return;
+  if (caveMap.open || cutscene || fx.active || ui.busy()) return;
   const t = nearest(isActionable);
+  if (!t && combat.collect()) return;
   // partner commands
   if (S.partner === 'wait' && silica.root.position.distanceTo(player.pos) < 2.5 && (!t || t.kind !== 'plate')) {
     S.partner = 'follow';
@@ -867,19 +940,14 @@ function onForm() {
 }
 
 function makeFromDesign(d: ToolDesign) {
-  // the parts must really be in the bag
-  const need: Record<string, number> = {};
-  for (const id of Object.values(d)) if (id) need[id] = (need[id] ?? 0) + 1;
-  if (Object.entries(need).some(([id, n]) => (S.inv[id] ?? 0) < n)) { ui.toast('部品が足りない。'); return; }
-  const t = makeTool(d);
-  if (!t) return;
-  for (const id of Object.values(d)) if (id) S.inv[id]--;
-  tools.push(t);
+  const t = craftFromInventory(d, S.inv, tools);
+  if (!t) { ui.toast('部品が足りないか、組み合わせが合わない。'); return null; }
   equip(t);
   sfx.chime(true);
   ui.toast(`CREATE　${t.name}　（切る ${t.stats.cut} / 突く ${t.stats.pierce} / たたく ${t.stats.impact}）`, true, 4000);
   setFlag('made_tool');
   persist();
+  return t;
 }
 function openBag() {
   if (cutscene || fx.active) return;
@@ -1027,7 +1095,7 @@ bindAction($('bForm'), 'Form');
 let runToggle = false;
 bindButton($('bRun'), () => { runToggle = !runToggle; $('bRun').classList.toggle('on', runToggle); });
 $('bBagTop').onclick = () => openBag();
-$('bCodex').onclick = () => showCodex(S.k, S.notes);
+$('bCodex').onclick = () => showCodex(S.k, S.notes, S.wildlifeMaterials);
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Escape') ['scanWrap', 'bagWrap', 'codexWrap', 'settingsWrap'].forEach((id) => ui.close(id));
 });
@@ -1136,7 +1204,14 @@ function frame(now: number) {
   T += dt;
   fpsA.push(dt); if (fpsA.length > 30) fpsA.shift();
   pollInput(dt);
+  if (caveMap.open) {
+    if (input.menu || input.codex) caveMap.close();
+    endFrame();
+    requestAnimationFrame(frame);
+    return;
+  }
   if (runToggle) input.run = true;
+  if (input.actionR && !cutscene && !fx.active && !ui.busy()) combat.attack();
   // actions (the same for touch, keyboard and gamepad)
   if (gotIsOpen() && (input.action || input.jump)) { dismissGot(); input.action = input.jump = false; }
   if (input.action || (input.jump && ui.sayOpen)) { if (ui.sayOpen) { ui.advance(); input.jump = false; } else void onAction(); }
@@ -1148,7 +1223,7 @@ function frame(now: number) {
     if (input.toolPrev) cycleTool(-1);
     if (input.toolNext) cycleTool(1);
     if (input.menu) { if (ui.busy()) ['scanWrap', 'bagWrap', 'codexWrap', 'settingsWrap'].forEach((id) => ui.close(id)); else if (S.k.create || Object.keys(S.inv).length) openBag(); else openSettings(); }
-    if (input.codex) { if (ui.busy()) ['scanWrap', 'bagWrap', 'codexWrap', 'settingsWrap'].forEach((id) => ui.close(id)); else if (S.k.scan) showCodex(S.k, S.notes); }
+    if (input.codex) { if (ui.busy()) ['scanWrap', 'bagWrap', 'codexWrap', 'settingsWrap'].forEach((id) => ui.close(id)); else if (S.k.scan) showCodex(S.k, S.notes, S.wildlifeMaterials); }
     if (input.action && ui.busy() && !ui.sayOpen) ['scanWrap', 'codexWrap'].forEach((id) => ui.close(id));
   }
   // the player turns the camera (not during cut-scenes or menus)
@@ -1170,6 +1245,11 @@ function frame(now: number) {
     }
   }
   if (!fx.frozen) carbon.update(dt);
+  adjustWeaponCarry(handMesh, heightAt);
+  const combatPaused = cutscene || fx.active || ui.busy();
+  combat.update(dt, combatPaused);
+  attackButton.hidden = combatPaused || !combat.nearby();
+  caveMap.update(dt, S.exploration, player.pos.x, player.pos.z, player.facing, mapObjective());
   triggers(dt);
   updatePartner(dt);
 
@@ -1288,8 +1368,9 @@ function frame(now: number) {
   const scanHint = scanT && dev !== 'touch' ? `${keyHint('Scan')}スキャン` : '';
   const pr = t ? `${keyHint('Interact')}${actionLabel(t)}` : null;
   ui.prompt(pr ? pr + (scanHint ? '　　' + scanHint : '') : scanHint || null);
-  $('bAct').classList.toggle('hide', !t);
-  $('bAct').textContent = t ? actionLabel(t).replace(/（.*$/, '') : 'E';
+  const canCollect = !t && !combatPaused && combat.hasLoot();
+  $('bAct').classList.toggle('hide', !t && !canCollect);
+  $('bAct').textContent = t ? actionLabel(t).replace(/（.*$/, '') : canCollect ? '拾う' : 'E';
   $('bScan').classList.toggle('hide', !S.k.scan);
   const canForm = S.form === 'sic' ? S.k.breakSkill : S.partner === 'follow' || S.partner === 'wait';
   $('bForm').classList.toggle('hide', !canForm);
@@ -1348,7 +1429,7 @@ requestAnimationFrame(frame);
 
 // test hooks
 (window as unknown as { __ch1: unknown }).__ch1 = {
-  get S() { return S; }, player, world, cam, silica, carbon, fx, ui, zones: ZONES, colDebug,
+  get S() { return S; }, caveMap, combat, player, world, cam, silica, carbon, fx, ui, zones: ZONES, colDebug,
   begin, onAction, onScan, onForm, makeFromDesign, equip, input, viewerStats, gotIsOpen, dismissGot, gotItem, understood, openBag, get tools() { return tools; }, heightAt, ceilAt, zoneAt,
   get renderInfo() { return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries }; },
   get cutscene() { return cutscene; }, level: (s: 'Si') => level(S.k, s), persist,
