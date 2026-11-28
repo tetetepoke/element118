@@ -225,6 +225,7 @@ export function encounters(host: CombatHost) {
   }
 
   return {
+    get attacking() { return swing > 0; },
     nearby() { return !!combatTarget(); },
     hasLoot() { return !!lootTarget(); },
     collect() {

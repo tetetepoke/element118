@@ -67,7 +67,11 @@ try {
     }, chapter);
     const initialUses = await evaluate((g) => g.tools[0].uses);
     await page.locator('#bAttack').tap();
-    await page.waitForTimeout(1200);
+    const waitForAttack = async (attacking) => page.waitForFunction(
+      ({ chapter, attacking }) => window[`__ch${chapter}`].combat.attacking === attacking, { chapter, attacking },
+    );
+    await waitForAttack(true);
+    await waitForAttack(false);
     assert.equal(await evaluate((g) => g.tools[0].uses), initialUses, 'wall blocks the weapon');
     assert.ok(await evaluate((g) => (g.S.hp ?? 60) === 60), 'wall blocks the creature');
     await evaluate((g) => { g.world.colliders.list.find((c) => c.id === 'test_wall').enabled = false; });
@@ -77,7 +81,7 @@ try {
       if (await evaluate((g, id) => !!g.S.defeated?.[id], enemyId)) break;
       if (attempt % 2) await page.locator('#bAttack').tap();
       else await page.keyboard.press('KeyG');
-      await page.waitForTimeout(1600);
+      await page.waitForTimeout(1800);
       console.log(`  Attempt ${attempt + 1}: ${await page.locator('#encounterStatus').textContent()}`);
     }
     assert.ok(await evaluate((g, id) => g.S.defeated?.[id]?.drops.length > 0 &&
