@@ -104,6 +104,23 @@ try {
     await page.waitForFunction(({ chapter, drop }) => window[`__ch${chapter}`].S.inv[drop] === 1, { chapter, drop });
     assert.equal(await evaluate((g, drop) => g.S.inv[drop], drop), 1);
     assert.ok(await evaluate((g, drop) => g.S.wildlifeMaterials.includes(drop) && !g.S.k.scanned.includes(drop), drop));
+    const remaining = await evaluate((g) => g.tools[0].uses);
+    assert.ok(remaining < initialUses);
+    await page.locator('#gotWrap').waitFor({ state: 'hidden' });
+    await evaluate((g) => {
+      Object.assign(g.S.inv, { sharp_stone: 1, stick: 1, fiber: 1 });
+      g.makeFromDesign({ kind: 'spear', head: 'sharp_stone', handle: 'stick', binding: 'fiber' });
+      g.openBag();
+    });
+    await page.locator('#bagPouch').tap();
+    assert.equal(await page.locator('[data-weapon]').count(), 2);
+    assert.match(await page.locator('[data-weapon="1"]').textContent(), /とがった石/);
+    await page.locator('[data-weapon="0"]').tap();
+    assert.match(await page.locator('[data-weapon="0"]').textContent(), /結晶の牙/);
+    assert.equal(await page.locator('meter').getAttribute('value'), String(remaining));
+    await page.locator('#equipWeapon').tap();
+    assert.match(await page.locator('[data-weapon="0"]').textContent(), /装備中/);
+    await page.locator('#bagX').tap();
     await page.reload();
     await page.locator('#bCont').tap();
     await page.locator('#miniMap').waitFor();
@@ -111,6 +128,8 @@ try {
     assert.equal(await evaluate((g, drop) => g.S.inv[drop], drop), 1);
     assert.ok(await evaluate((g, id) => !!g.S.defeated[id] && !g.world.colliders.list.find((c) => c.id === id).enabled &&
       g.carbon.rightHand.children.some((child) => child.userData.attackTip), enemyId));
+    assert.equal(await evaluate((g) => g.S.equipped), 0);
+    assert.equal(await evaluate((g) => g.tools[0].uses), remaining);
     assert.deepEqual(errors, []);
     console.log(`Chapter ${chapter}: map, craft, actual attack, wall, loot and reload passed`);
     await page.close();

@@ -9,7 +9,7 @@
 #encounterStatus { position:fixed; z-index:3; top:calc(env(safe-area-inset-top) + 55px); left:50%; transform:translateX(-50%); max-width:44vw; padding:5px 9px; border-radius:6px; color:#ffe4bb; background:#17202bde; font:600 12px system-ui; text-align:center; pointer-events:none; }
 #bAttack { position:fixed; z-index:3; right:calc(env(safe-area-inset-right) + 185px); bottom:calc(env(safe-area-inset-bottom) + 109px); width:63px; height:53px; border:1px solid #e0a977; border-radius:22px; background:#3a292adf; color:#fff3e2; font-weight:700; }
 #bAttack[hidden], #miniMap[hidden], #encounterStatus[hidden] { display:none; }
-#bagPanel:has(.craft-layout) { width:min(93vw, 980px); max-width:none; touch-action:pan-y; }
+#bagPanel:has(.bag-tabs) { width:min(93vw, 980px); max-width:none; touch-action:pan-y; }
 .craft-type select { margin:4px 0 8px 8px; min-height:36px; background:#263953; color:#fff; }
 .craft-layout { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, .9fr); gap:8px; }
 .craft-layout section { min-width:0; background:#101a2a8f; border:1px solid #38516d; border-radius:8px; padding:8px; }
@@ -33,4 +33,19 @@
   .craft-preview .pv { height:clamp(75px, 23dvh, 160px); }
   .craft-supplies .grid { max-height:125px; }
   #bAttack { right:calc(env(safe-area-inset-right) + 184px); bottom:calc(env(safe-area-inset-bottom) + 107px); width:58px; height:48px; }
+}
+.bag-tabs { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px; }
+.bag-tabs button,.pouch-list button { color:#edf3f9; background:#18283d; border:1px solid #4b6684; border-radius:7px; padding:8px; min-height:42px; }
+.bag-tabs button[aria-pressed=true],.pouch-list button[aria-pressed=true] { background:#243c56; border-color:#a5dafa; }
+.weapon-pouch { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.1fr); gap:10px; touch-action:pan-y; }
+.weapon-pouch section { min-width:0; }
+.pouch-list { display:flex; flex-direction:column; gap:5px; max-height:55dvh; overflow:auto; touch-action:pan-y; }
+.pouch-list button { flex:none; display:grid; gap:3px; text-align:left; }
+.pouch-list button span { font-size:12px; }
+.pouch-detail h3 { margin:2px 0; }
+.pouch-detail .pv { height:clamp(98px, 28dvh, 210px); }
+.pouch-detail meter { width:min(130px, 100%); }
+@media (max-width:520px) {
+  .weapon-pouch { grid-template-columns:1fr; }
+  .pouch-list { max-height:30dvh; }
 }

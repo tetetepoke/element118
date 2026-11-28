@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { ITEMS, MATERIALS, type ItemDef, type StatKey } from './materials';
 import { CHAPTER_CARBON_SCALE } from '../../core/chapterPresentation';
-import { WEAPONS, PART_SLOTS, eligiblePart, type WeaponKind } from '../../gameplay/weaponTypes';
+import { WEAPONS, PART_SLOTS, eligiblePart, type PartSlot, type WeaponKind } from '../../gameplay/weaponTypes';
 
 export interface ToolDesign {
   handle: string | null;
@@ -19,6 +19,7 @@ export interface ToolStats {
   impact: number;
   weight: number;
   durability: number;
+  limitingPart: PartSlot;
   attack: number;
   attackSpeed: number;
   effect?: string;
@@ -62,15 +63,21 @@ export function toolStats(d: ToolDesign): ToolStats | null {
   const impact = h.mass * (0.5 + h.blunt) * (0.5 + lever) * hard;
   const cut = h.edge * hm.hardness * (0.55 + lever * 0.45);
   const pierce = h.point * hm.hardness * (0.45 + lever * 0.55);
-  // the weakest part and how well they are tied decide how long it lasts
-  const toughs = [hm.toughness, handle ? MATERIALS[handle.mat].toughness : 10];
-  const tied = head && handle ? (bind ? 1.6 : 0.7) : 1;
-  const durability = Math.min(...toughs) * tied * 3;
+  // Compare the load each part can tolerate. Material ratings and the result are game units.
+  const handleMat = handle && MATERIALS[handle.mat];
+  const bindingMat = bind && MATERIALS[bind.mat];
+  const headLoad = profile?.stat === 'impact' ? 1.2 : 1;
+  const bendingLoad = 1 + (head?.mass ?? 0) * lever * 0.19;
+  const limits: [PartSlot, number][] = [];
+  if (head) limits.push(['head', (hm.toughness * 4 + hm.hardness * 0.7) / headLoad]);
+  if (handleMat) limits.push(['handle', handleMat.toughness * 5 / bendingLoad]);
+  if (head && handle) limits.push(['binding', (bindingMat ? 8 + bindingMat.toughness * 4.5 : 11) / bendingLoad]);
+  const [limitingPart, durability] = limits.reduce((weakest, part) => part[1] < weakest[1] ? part : weakest);
   const values = { impact, cut, pierce };
   const effect = d.head === 'cave_lantern' ? '灯り：暗所で先端が光る' : d.head === 'cave_fang' ? '結晶：硬い相手に追加ダメージ' : undefined;
   const length = profile ? weaponDimensions(d).tip : 0;
   return { reach: r1(profile ? 0.55 + length * CHAPTER_CARBON_SCALE : reach), cut: r1(cut), pierce: r1(pierce), impact: r1(impact),
-    weight: r1(weight), durability: Math.max(3, Math.round(durability)),
+    weight: r1(weight), durability: Math.max(3, Math.round(durability)), limitingPart,
     attack: Math.round(4 + (profile ? values[profile.stat] * 2.1 : Math.max(cut, pierce, impact) * 1.65)),
     attackSpeed: r1((profile?.speed ?? 0.89) * (1.6 / (1 + weight * 0.11))), effect };
 }
@@ -97,6 +104,31 @@ export function makeTool(d: ToolDesign): Tool | null {
   const s = toolStats(d);
   if (!s) return null;
   return { design: { ...d }, stats: s, name: toolName(d, s), uses: s.durability };
+}
+
+export interface SavedTool {
+  design: ToolDesign;
+  uses: number;
+  capacity?: number;
+}
+
+export function restoreTool(saved: SavedTool): Tool | null {
+  const tool = makeTool(saved.design);
+  if (!tool) return null;
+  const { head, handle, binding } = saved.design;
+  const legacyCapacity = saved.capacity ?? Math.max(3, Math.round(Math.min(
+    MATERIALS[ITEMS[(head ?? handle)!].mat].toughness,
+    handle ? MATERIALS[ITEMS[handle].mat].toughness : 10,
+  ) * (head && handle ? (binding ? 1.6 : 0.7) : 1) * 3));
+  tool.uses = Math.max(1, Math.min(tool.stats.durability, Math.ceil(tool.stats.durability * saved.uses / legacyCapacity)));
+  return tool;
+}
+
+/** A harder contact surface increases edge wear. Toughness is accounted for in capacity. */
+export function toolWear(tool: Tool, contactHardness: number) {
+  const part = ITEMS[(tool.design.head ?? tool.design.handle)!];
+  const excess = contactHardness - MATERIALS[part.mat].hardness;
+  return 1 + Math.max(0, Math.ceil(excess / 3));
 }
 
 export function craftFromInventory(d: ToolDesign, inventory: Record<string, number>, tools: Tool[]) {
