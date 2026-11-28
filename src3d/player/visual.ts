@@ -432,18 +432,46 @@ function maskTexture(detailed = false) {
     }
   }
   g.fillStyle = '#de5c3e';
-  g.fillRect(40, 64, 10, 44);
-  g.fillRect(206, 150, 10, 30);
+  if (detailed) {
+    for (const x of [65, 188]) {
+      g.beginPath();
+      g.ellipse(x, 183, 13, 6, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+  } else {
+    g.fillRect(40, 64, 10, 44);
+    g.fillRect(206, 150, 10, 30);
+  }
   g.fillStyle = '#2e2834';
-  g.font = 'bold 150px "Hiragino Sans", "Noto Sans JP", Arial, sans-serif';
+  g.font = `bold ${detailed ? 88 : 150}px "Hiragino Sans", "Noto Sans JP", Arial, sans-serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillText('C', 122, 110);
-  g.font = 'bold 50px Arial, sans-serif';
-  g.fillText('6', 198, 192);
+  g.fillText('C', 122, detailed ? 103 : 110);
+  g.font = `bold ${detailed ? 34 : 50}px Arial, sans-serif`;
+  g.fillText('6', detailed ? 199 : 198, detailed ? 207 : 192);
   g.fillStyle = '#3a2a2e';
-  g.beginPath(); g.ellipse(86, 208, 19, 11, -0.1, 0, Math.PI * 2); g.fill();
-  g.beginPath(); g.ellipse(160, 208, 19, 11, 0.1, 0, Math.PI * 2); g.fill();
+  if (detailed) {
+    for (const x of [84, 167]) {
+      g.fillStyle = '#3a2a2e';
+      g.beginPath();
+      g.ellipse(x, 159, 13, 17, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#fff9ec';
+      g.beginPath();
+      g.ellipse(x - 3, 153, 4, 5, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.strokeStyle = '#3a2a2e';
+    g.lineWidth = 5;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(111, 190);
+    g.quadraticCurveTo(126, 207, 141, 190);
+    g.stroke();
+  } else {
+    g.beginPath(); g.ellipse(86, 208, 19, 11, -0.1, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(160, 208, 19, 11, 0.1, 0, Math.PI * 2); g.fill();
+  }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -489,13 +517,13 @@ export class ProceduralCarbon implements CharacterVisual {
       const z = mp.getZ(i);
       const jaw = THREE.MathUtils.smoothstep(-y, 0.015, 0.23);
       const chin = Math.max(0, -y - 0.05) * Math.max(0, 1 - Math.abs(x) * 2.2);
-      if (detailed) mp.setXYZ(i, x * (1 - 0.19 * jaw), y - 0.029 * jaw, z + chin * 0.62);
+      if (detailed) mp.setXYZ(i, x * (1 + 0.075 * jaw), y + 0.012 * jaw, z + chin * 0.48);
       else mp.setZ(i, z + chin * 0.5);
     }
     maskG.computeVertexNormals();
     const mask = mesh(maskG, new THREE.MeshStandardMaterial({ map: maskTexture(opts.smooth), roughness: opts.smooth ? 0.59 : 0.45, side: THREE.DoubleSide, ...(opts.smooth ? surfaceBump('ceramic', 0.014) : {}) }), b.head);
     mask.position.set(0, -0.01, 0.045);
-    mask.scale.set(detailed ? 1 : 1.05, detailed ? 1.11 : 1.08, 1.12);
+    mask.scale.set(detailed ? 1.07 : 1.05, detailed ? 1.06 : 1.08, 1.12);
     const hornM = std(0xf6f1e8, { roughness: 0.35 });
     for (const sx of [1, -1]) {
       const horn = mesh(bentCone(0.055, 0.3, -0.12, 8), hornM, b.head);
