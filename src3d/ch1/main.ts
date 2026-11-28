@@ -419,7 +419,7 @@ async function cityTalk() {
     setFlag('city_talk');
     const a = world.npcs.find((n) => n.id === 'res_a')!, b = world.npcs.find((n) => n.id === 'res_b')!;
     a.lookAt(player.pos); b.lookAt(player.pos);
-    setCine(player.pos.x + 4, player.pos.y + 2.4, player.pos.z + 2, a.root.position.x, a.root.position.y + 1.2, a.root.position.z);
+    setCine(player.pos.x + 4, player.pos.y + 2.4, player.pos.z + 2, a.root.position.x, a.root.position.y + 0.6, a.root.position.z);
     await ui.say('カーボン', '外は？');
     await ui.say('住民', '外？');
     await ui.say('住民の子', '外って何？');
@@ -434,7 +434,7 @@ async function elderTalk() {
   e.lookAt(player.pos);
   if (!flag('elder')) {
     await scene_(async () => {
-      setCine(player.pos.x - 3, player.pos.y + 2.2, player.pos.z + 3, e.root.position.x, e.root.position.y + 1.4, e.root.position.z);
+      setCine(player.pos.x - 3, player.pos.y + 2.2, player.pos.z + 3, e.root.position.x, e.root.position.y + 0.7, e.root.position.z);
       await ui.say('老人', '上へ行きたいのか。');
       await ui.say('カーボン', 'うん。');
       const rp = new THREE.Vector3(44, 20, 1);
@@ -469,7 +469,7 @@ async function researcherTalk() {
   if (!flag('elder')) { await ui.say('研究者', 'ん？ 根の光を見に来たの？ まずは、ひろばの奥の長老に会ってきなよ。'); return; }
   if (!k.scan) {
     await scene_(async () => {
-      setCine(player.pos.x + 2.5, player.pos.y + 1.8, player.pos.z + 2.5, r.root.position.x, r.root.position.y + 1.3, r.root.position.z);
+      setCine(player.pos.x + 2.5, player.pos.y + 1.8, player.pos.z + 2.5, r.root.position.x, r.root.position.y + 0.65, r.root.position.z);
       await ui.say('研究者', 'あんたが「降ってきた」子？ ……その胸の結晶、根と同じ色だね。');
       await ui.say('研究者', 'ちょっと、この石にさわってみて。');
       carbon.playAction('bond');
@@ -1139,6 +1139,7 @@ function frame(now: number) {
   const { forward, right } = cam.basis();
   const free = !cutscene && !ui.busy() && !fx.frozen;
   if (!cutscene) {
+    for (const n of world.npcs) n.syncCollider();
     if (!free) player.locked = true;
     else if (!fx.active) player.locked = false;
     const steps = Math.max(1, Math.ceil(dt / (1 / 30)));
@@ -1200,7 +1201,7 @@ function frame(now: number) {
   }
   if (farOn >= 0) { farOn = Math.min(1, farOn + dt * 0.4); (world.doors.farLights.material as THREE.PointsMaterial).opacity = farOn * 0.9; }
 
-  for (const n of world.npcs) n.update(dt, heightAt);
+  for (const n of world.npcs) n.update(dt, heightAt, cutscene ? undefined : player.pos);
   for (const c of world.crawlers) c.update(dt, heightAt, player.pos, player.horizontalSpeed);
   for (const s of world.snails) s.update(dt, heightAt);
   world.hakobi.update(dt, false);

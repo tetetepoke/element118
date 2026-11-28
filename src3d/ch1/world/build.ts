@@ -2,6 +2,7 @@
 // interactable "thing". Logic (what happens) is in main.ts + game/*; this file only places things.
 import * as THREE from 'three';
 import { ColliderWorld } from '../../world/colliders';
+import { addFieldObject } from '../../world/fieldObjects';
 import { buildCaveMeshes, FLOOR_SEG, heightAt, SPOTS, RIVER, CHASM, CORRIDORS, ZONES, vnoise } from './cavern';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildDumpProps } from './dumpProps';
@@ -162,7 +163,7 @@ export function buildWorld() {
   lights.push({ pos: new THREE.Vector3(30, crane.position.y + 5, 128), color: 0xffb060, power: 3 });
   // dump lamps on poles
   const lampPost = (x: number, z: number) => {
-    cyl(`post_${x}_${z}`, x, z, 0.08, 4, std(0x4a4a4a, { metalness: 0.5 }), { collide: false, seg: 6 });
+    cyl(`post_${x}_${z}`, x, z, 0.08, 4, std(0x4a4a4a, { metalness: 0.5 }), { seg: 6 });
     const b = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 6), std(0xffe0a0, { emissive: 0xffa040, emissiveIntensity: 2.5 }));
     b.position.set(x, g(x, z) + 4.1, z);
     root.add(b);
@@ -240,6 +241,7 @@ export function buildWorld() {
     }
     grp.position.set(x, g(x, z), z);
     root.add(grp);
+    addFieldObject(colliders, { id, model: grp, fit: 0.85 });
     things.push({ id, kind: 'node', mat: 'hematite', pos: grp.position.clone(), r: 2.4, obj: grp, give: ['ore'], left: 99, label: '赤い鉱石' });
   };
   oreVein('cave_ore', -35, 125);
@@ -287,7 +289,8 @@ export function buildWorld() {
     roof.position.set(x, g(x, z) + 2.3, z);
     roof.rotation.y = -a;
     root.add(roof);
-    for (const s of [-1, 1]) cyl(`stallp${i}${s}`, x + Math.cos(a + Math.PI / 2) * s * 1.2, z + Math.sin(a + Math.PI / 2) * s * 1.2, 0.05, 2.3, std(0x4a3a2a), { collide: false, seg: 5 });
+    addFieldObject(colliders, { id: `stall_roof${i}`, model: roof });
+    for (const s of [-1, 1]) cyl(`stallp${i}${s}`, x + Math.cos(a + Math.PI / 2) * s * 1.2, z + Math.sin(a + Math.PI / 2) * s * 1.2, 0.05, 2.3, std(0x4a3a2a), { seg: 5 });
     const goods = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), i % 2 ? std(0xb8a8e8, { emissive: 0x5a40a0, emissiveIntensity: 0.8 }) : std(0xd8b070));
     goods.position.set(x, g(x, z) + 1.15, z);
     root.add(goods);
@@ -359,6 +362,7 @@ export function buildWorld() {
     n.root.rotation.y = face;
     if (wander) n.setWander(n.root.position, wander);
     root.add(n.root);
+    n.addCollider(colliders);
     npcs.push(n);
     things.push({ id, kind: 'npc', mat: 'creature', pos: n.root.position, r: 2.4, npc: n });
     return n;
@@ -394,7 +398,7 @@ export function buildWorld() {
   updaters.push((t, dt) => fish.update(dt, t, RIVER.x0, RIVER.x1));
   things.push({ id: 'fish', kind: 'scan', mat: 'creature', pos: new THREE.Vector3(-70, RIVER.level, RIVER.z), r: 7, label: 'メナシウオ' });
   // the grate where the river leaves (fall in and the current carries you here)
-  for (let i = 0; i < 7; i++) cyl(`grate${i}`, RIVER.x1 + 4, RIVER.z - 3 + i, 0.08, 3, std(0x5a5a5a, { metalness: 0.6 }), { y: RIVER.level - 2, collide: false, seg: 5 });
+  for (let i = 0; i < 7; i++) cyl(`grate${i}`, RIVER.x1 + 4, RIVER.z - 3 + i, 0.08, 3, std(0x5a5a5a, { metalness: 0.6 }), { y: RIVER.level - 2, seg: 5 });
   // solution A: a tall fungus stalk on the bank. Cut or knock it down and it falls across.
   const st = SPOTS.riverStalk;
   const stalk = new THREE.Group();
@@ -499,6 +503,7 @@ export function buildWorld() {
     }
     grp.position.set(x, g(x, z), z);
     root.add(grp);
+    addFieldObject(colliders, { id, model: grp, fit: 0.85 });
     if (give) things.push({ id, kind: 'node', mat: 'quartz', pos: grp.position.clone(), r: 2.2, obj: grp, give: ['quartz'], left: 99, label: '透明な結晶' });
     return grp;
   };
@@ -553,9 +558,7 @@ export function buildWorld() {
     const x = cz.c.x + Math.cos(a) * cz.rx * rr, z = cz.c.y + Math.sin(a) * cz.rz * rr;
     if (Math.hypot(x - SPOTS.rootShaft.x, z - SPOTS.rootShaft.y) < 8) continue;
     const s = 1.2 + rnd() * 3.5;
-    const cl = quartzCluster(`crys${i}`, x, z, 5, s, i % 5 === 0);
-    if (s > 3) colliders.add({ id: `crys${i}`, kind: 'cyl', x, z, r: s * 0.45, bottom: g(x, z) - 1, top: g(x, z) + s * 1.1 });
-    void cl;
+    quartzCluster(`crys${i}`, x, z, 5, s, i % 5 === 0);
   }
   lights.push({ pos: new THREE.Vector3(105, cz.y + 6, -20), color: 0x80b8ff, power: 4 });
   root.add(glowMotes(new THREE.Vector3(108, cz.y + 2, -12), new THREE.Vector3(30, 50, 30), 220, 0x9fd8ff).obj);
@@ -598,6 +601,8 @@ export function buildWorld() {
   }
   lift.position.set(fac.c.x + 12, g(fac.c.x + 12, fac.c.y + 2), fac.c.y + 2);
   root.add(lift);
+  lift.updateMatrixWorld(true);
+  lift.children.forEach((model, i) => addFieldObject(colliders, { id: `lift_${i}`, model, collider: i === 0 ? 'cyl' : 'box' }));
   things.push({ id: 'lift', kind: 'scan', mat: 'machine', pos: lift.position.clone(), r: 4, label: '動かない昇降機' });
   lights.push({ pos: new THREE.Vector3(fac.c.x, fac.y + 6, fac.c.y), color: 0x8ab0e0, power: 3 });
 
