@@ -76,3 +76,10 @@
 | `unknown_device`（電気が必要な装置） | 32×32 | 0 停止、1 作動 |
 | `crystal_deco` | 16×32 | 1コマ |
 | `shard`（結晶の弾） | 8×8 | 1コマ |
+
+## 3D 洞窟（第1章・第2章）
+
+`public/assets/terrain/` の写真テクスチャは、Poly Haven の CC0 素材をグレースケールに変換し、明るさを調整して 512px の WebP にしたものです。
+
+- `cave-ground.webp` [Rock Ground 02](https://polyhaven.com/a/rock_ground_02)
+- `cave-rock.webp` [Rock Face 03](https://polyhaven.com/a/rock_face_03)
