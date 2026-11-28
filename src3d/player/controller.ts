@@ -352,7 +352,7 @@ export class PlayerController {
       else { st = 'Fall'; phase = 'fall'; }
     } else if (this.landT > 0) { st = 'Land'; phase = 'land'; }
     else if (this.speed < 0.3) st = 'Idle';
-    else st = this.speed > (T.walk + T.run) / 2 ? 'Run' : 'Walk';
+    else st = this.speed > (T.walk + T.run) * this.speedMul / 2 ? 'Run' : 'Walk';
     this.info = { phase, impact: st === 'Land' ? this.info.impact : 0, turn };
     this.setState(st, Math.min(1, this.speed / T.run));
     this.applyVisual();

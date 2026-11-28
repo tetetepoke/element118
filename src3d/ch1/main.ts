@@ -100,6 +100,7 @@ const CARBON_SCALE = 0.39;
 const carbon = new ProceduralCarbon({ smooth: true, scale: CARBON_SCALE });
 scene.add(carbon.root);
 const player = new PlayerController(carbon, world.colliders);
+player.speedMul = 0.85;
 const silica = new ProceduralSilica({ smooth: true });
 silica.root.visible = false;
 scene.add(silica.root);
@@ -270,15 +271,18 @@ function nearest(filter: (t: Thing) => boolean, extra = 0.6) {
   for (const t of world.things) {
     if (t.broken || !filter(t)) continue;
     const d = Math.hypot(t.pos.x - player.pos.x, t.pos.z - player.pos.z);
-    if (d > t.r + extra || Math.abs(t.pos.y - player.pos.y) > 5 + t.r * 0.5) continue;
+    const verticalReach = t.kind === 'pick' ? 1.2 : 5 + t.r * 0.5;
+    if (d > t.r + extra || Math.abs(t.pos.y - player.pos.y) > verticalReach) continue;
     if (d < bd) { bd = d; best = t; }
   }
   return best;
 }
 const isActionable = (t: Thing) => t.kind !== 'scan' || !S.k.scan || t.id === 'hakobi';
+const isScannable = (t: Thing) => t.kind !== 'npc' && t.kind !== 'pick';
 function actionLabel(t: Thing): string {
   switch (t.kind) {
     case 'npc': return '話す';
+    case 'pick': return '素材を拾う';
     case 'node': return `取る（${S.k.scan ? t.label : '???'}）`;
     case 'obstacle': {
       const c = canBreak(t.mat, power());
@@ -764,6 +768,15 @@ async function onAction() {
   if (!t) return;
   carbon.root.rotation.y = player.facing = Math.atan2(t.pos.x - player.pos.x, t.pos.z - player.pos.z);
   if (t.kind === 'npc') return npcTalk(t.id);
+  if (t.kind === 'pick') {
+    const item = t.give![0];
+    breakThing(t, true);
+    addItem(item);
+    persist();
+    sfx.pick();
+    void gotItem(item);
+    return;
+  }
   if (t.kind === 'plate') {
     if (S.partner === 'follow') {
       S.partner = 'wait';
@@ -821,7 +834,7 @@ async function onAction() {
 function onScan() {
   if (cutscene || fx.active || ui.busy()) return;
   if (!S.k.scan) { ui.toast('まだ、物の中は見えない。'); return; }
-  const t = nearest((k) => k.kind !== 'npc', 4);
+  const t = nearest(isScannable, 4);
   if (!t) { ui.toast('近くにスキャンできる物がない。'); return; }
   sfx.scan();
   carbon.flashCrystal(0.6);
@@ -1265,7 +1278,7 @@ function frame(now: number) {
 
   // prompts and buttons
   const t = !cutscene && !ui.busy() ? nearest(isActionable) : null;
-  const scanT = S.k.scan && !cutscene ? nearest((k) => k.kind !== 'npc', 4) : null;
+  const scanT = S.k.scan && !cutscene ? nearest(isScannable, 4) : null;
   const dev = getLastDevice();
   const scanHint = scanT && dev !== 'touch' ? `${keyHint('Scan')}スキャン` : '';
   const pr = t ? `${keyHint('Interact')}${actionLabel(t)}` : null;
