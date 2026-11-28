@@ -235,8 +235,12 @@ export function buildDumpProps(ctx: Ctx) {
     const [x, z] = s;
     const lying = rnd() < 0.35;
     const y = g(x, z);
-    if (lying) put(drums, x, y + 0.4, z, e.set(Math.PI / 2, rnd() * 6, 0), sv.set(1, 1, 1), RUST[i % RUST.length]);
-    else {
+    if (lying) {
+      const yaw = rnd() * 6;
+      put(drums, x, y + 0.4, z, e.set(Math.PI / 2, yaw, 0, 'YXZ'), sv.set(1, 1, 1), RUST[i % RUST.length]);
+      colliders.add({ id: `drum${i}`, kind: 'box', x, z, hx: 0.45, hz: 0.58, rot: -yaw, bottom: y - 0.05, top: y + 0.85 });
+      e.order = 'XYZ';
+    } else {
       put(drums, x, y + 0.58, z, e.set((rnd() - 0.5) * 0.15, rnd() * 6, (rnd() - 0.5) * 0.15), sv.set(1, 1, 1), RUST[i % RUST.length]);
       colliders.add({ id: `drum${i}`, kind: 'cyl', x, z, r: 0.45, bottom: y - 1, top: y + 1.2 });
     }
@@ -267,6 +271,7 @@ export function buildDumpProps(ctx: Ctx) {
     const [x, z, hy] = free ? [free[0], free[1], 0] : onMound();
     const s = big ? 1.1 + rnd() * 0.9 : 0.35 + rnd() * 0.4;
     put(gears, x, g(x, z) + (free ? s * 0.85 : hy), z, e.set(free ? 0.25 : rnd() * 3, rnd() * 6, free ? (rnd() - 0.5) * 0.3 : rnd() * 3), sv.setScalar(s), RUST[(i + 3) % RUST.length]);
+    if (free) colliders.add({ id: `gear${i}`, kind: 'box', x, z, hx: 0.8 * s, hz: 0.25 * s, rot: -e.y, bottom: g(x, z) - 0.05, top: g(x, z) + 1.65 * s });
   }
   // ── metal sheets leaning and lying ──
   const sheets = inst(new THREE.BoxGeometry(1.6, 0.03, 1.0, 1, 1, 1), M.sheet, 44);

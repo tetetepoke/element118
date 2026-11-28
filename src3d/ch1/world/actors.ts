@@ -2,6 +2,8 @@
 // owns a `root` Object3D, so a GLB can replace it later without touching gameplay code.
 import * as THREE from 'three';
 import { buildBody, BodyAnimator, type BodyOpts } from '../../player/visual';
+import { TUNING } from '../../player/controller';
+import type { Collider, ColliderWorld } from '../../world/colliders';
 
 const std = (c: number, o: Partial<THREE.MeshStandardMaterialParameters> = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8, ...o });
 
@@ -26,6 +28,8 @@ export class Npc {
   private body: ReturnType<typeof buildBody>;
   private target: THREE.Vector3 | null = null;
   private wander: { home: THREE.Vector3; r: number; wait: number } | null = null;
+  private collider?: Collider;
+  private height: number;
   facing = 0;
   constructor(public id: string, public look: NpcLook) {
     const L = LOOKS[look];
@@ -106,7 +110,22 @@ export class Npc {
       lantern.position.set(0, -0.32, 0.05);
       this.body.armL.lower.add(lantern);
     }
+    this.root.scale.setScalar(0.5);
+    const bounds = new THREE.Box3().setFromObject(this.root);
+    this.height = bounds.max.y;
     this.root.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
+  }
+  addCollider(world: ColliderWorld) {
+    const { x, y, z } = this.root.position;
+    this.collider = world.add({
+      id: `npc_${this.id}`, kind: 'cyl', x, z, r: 0.22 * (LOOKS[this.look].scale ?? 1),
+      bottom: y, top: y + this.height, dynamic: true, climbable: false, cameraIgnore: true, model: this.root,
+    });
+  }
+  syncCollider() {
+    if (!this.collider) return;
+    const { x, y, z } = this.root.position;
+    Object.assign(this.collider, { x, z, bottom: y, top: y + this.height, enabled: this.root.visible });
   }
   walkTo(p: THREE.Vector3 | null) { this.target = p ? p.clone() : null; }
   setWander(home: THREE.Vector3, r: number) { this.wander = { home: home.clone(), r, wait: Math.random() * 3 }; }
@@ -114,7 +133,7 @@ export class Npc {
     this.facing = Math.atan2(p.x - this.root.position.x, p.z - this.root.position.z);
   }
   play(name: string) { this.anim.play(name, 0.8); }
-  update(dt: number, groundY: (x: number, z: number) => number) {
+  update(dt: number, groundY: (x: number, z: number) => number, player?: THREE.Vector3) {
     let moving = false;
     if (!this.target && this.wander) {
       this.wander.wait -= dt;
@@ -130,13 +149,22 @@ export class Npc {
       if (d < 0.2) this.target = null;
       else {
         const sp = Math.min(d, 1.6 * dt);
-        this.root.position.x += (dx / d) * sp;
-        this.root.position.z += (dz / d) * sp;
+        const p = this.root.position;
+        const x = p.x + (dx / d) * sp, z = p.z + (dz / d) * sp;
+        const y = groundY(x, z);
+        const gap = this.collider?.r ?? 0;
+        const blocked = player && this.root.visible && player.y < y + this.height && player.y + TUNING.height > y
+          && Math.hypot(x - player.x, z - player.z) < gap + TUNING.radius
+          && Math.hypot(x - player.x, z - player.z) < Math.hypot(p.x - player.x, p.z - player.z);
+        if (!blocked) {
+          p.set(x, y, z);
+          moving = true;
+        }
         this.facing = Math.atan2(dx, dz);
-        moving = true;
       }
     }
     this.root.position.y = groundY(this.root.position.x, this.root.position.z);
+    this.syncCollider();
     let df = this.facing - this.root.rotation.y;
     df = Math.atan2(Math.sin(df), Math.cos(df));
     this.root.rotation.y += df * Math.min(1, dt * 6);
