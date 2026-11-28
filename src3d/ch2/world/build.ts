@@ -243,6 +243,7 @@ export function buildWorld() {
     n.root.rotation.y = face;
     if (wander) n.setWander(n.root.position, wander);
     root.add(n.root);
+    n.addCollider(colliders);
     npcs.push(n);
     things.push({ id, kind: 'npc', mat: 'creature', pos: n.root.position, r: 2.4 });
     return n;

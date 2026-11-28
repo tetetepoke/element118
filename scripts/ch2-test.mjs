@@ -5,8 +5,8 @@ import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 mkdirSync('test-output', { recursive: true });
 const BASE = process.env.BASE ?? 'http://localhost:4173/element118/';
-const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const page = await b.newPage({ viewport: { width: 1280, height: 720 } });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await b.newPage({ viewport: { width: 800, height: 500 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -30,12 +30,17 @@ const walk = (pts, o = {}) => G(async (G, a) => {
   let n = 0;
   for (const [x, z] of a.pts) {
     let tries = 0;
+    const deadline = performance.now() + 30000;
     while (tries++ < (a.o.max ?? 2400)) {
-      while (G.cutscene || G.fx.active || G.ui.sayOpen || G.gotIsOpen()) { if (G.gotIsOpen()) G.dismissGot(); await new Promise((r) => setTimeout(r, 50)); }
+      while (G.cutscene || G.fx.active || G.ui.busy() || G.choiceOpen || pl.locked) {
+        if (performance.now() > deadline) throw new Error(`Movement stayed locked before waypoint ${x}, ${z}`);
+        if (G.gotIsOpen()) G.dismissGot();
+        await new Promise((r) => setTimeout(r, 50));
+      }
       const dx = x - pl.pos.x, dz = z - pl.pos.z, l = Math.hypot(dx, dz);
       if (l < (a.o.tol ?? 0.9)) break;
       inp.run = l > 3 && !a.o.walk;
-      inp.jump = !!a.o.jump && tries % 18 === 0;
+      inp.jump = !!a.o.jump && l > 2.5 && tries % 18 === 0;
       pl.update(1 / 30, inp, new V(dx / l, 0, dz / l), new V(-dz / l, 0, dx / l));
       if (++n % 45 === 0) await new Promise((r) => requestAnimationFrame(() => r()));
     }
@@ -48,7 +53,10 @@ const dismiss = async () => { for (let i = 0; i < 20; i++) { const open = await 
 const act = async () => { await G((G) => G.onAction()); await page.waitForTimeout(150); await idle(); await dismiss(); await idle(); await closePanels(); };
 const pick = async (text) => {
   for (let i = 0; i < 10 && !(await G((G) => G.choiceOpen)); i++) { await dismiss(); await idle(); await G((G) => G.onAction()); await page.waitForTimeout(250); }
-  if (!(await G((G) => G.choiceOpen))) console.log('    (no choice panel)', JSON.stringify(await G((G) => ({ busy: G.ui.busy(), say: G.ui.sayOpen, cut: G.cutscene, got: G.gotIsOpen(), p: [G.player.pos.x, G.player.pos.z] }))));
+  if (!(await G((G) => G.choiceOpen))) {
+    console.log('    (no choice panel)', JSON.stringify(await G((G) => ({ busy: G.ui.busy(), say: G.ui.sayOpen, cut: G.cutscene, got: G.gotIsOpen(), p: [G.player.pos.x, G.player.pos.z] }))));
+    return false;
+  }
   const ok = await page.evaluate((t) => { const bt = [...document.querySelectorAll('#choicePanel button.opt')].find((x) => x.textContent.includes(t) && !x.disabled); if (bt) { bt.click(); return true; } return false; }, text);
   await page.waitForTimeout(150); await idle(); await dismiss(); await idle(); await closePanels();
   return ok;
@@ -63,6 +71,8 @@ await idle();
 await shot('01-start');
 check((await mission()) === '上へ', 'mission: 上へ');
 check((await S()).partners.silica === 'follow', 'Silica is along');
+check(await G((G) => G.carbon.root.scale.x === 0.39 && G.player.speedMul === 0.85), 'Chapter 1 presentation carries over');
+check(await G((G) => G.world.npcs.every((n) => G.world.colliders.list.some((c) => c.model === n.root && c.enabled))), 'NPCs have active colliders');
 
 console.log('the lift has no power');
 let r = await walk([[6, 93], [14, 91], [19, 90.3]]);
@@ -101,7 +111,9 @@ check(((await S()).inv.malachite ?? 0) >= 1, 'harvested malachite');
 await G((G) => G.onScan()); await idle(); await closePanels();
 
 console.log('the furnace: copper and wire');
-r = await walk([[-50, 0], [-38, 3], [-31, 7], [sp.furnace[0] + 1.5, sp.furnace[1] + 2.4]]);
+await walk([[-50, 0], [-38, 3], [-31, 7]], { jump: true });
+r = await walk([[sp.furnace[0] + 1.5, sp.furnace[1] + 2.4]]);
+check(r.d < 1.6, `returned from the green mine to the furnace (${r.x}, ${r.y}, ${r.z})`);
 await G((G) => G.onAction()); await page.waitForTimeout(200);
 check(await pick('銅を取り出す'), 'furnace: smelt copper');
 let st = await S();
@@ -117,8 +129,10 @@ await act();
 check((await S()).flags.legend, 'keeper: the copper child sleeps in the deep vein');
 
 console.log('the deep vein: rubble (SiC), bugs, Cupra');
-r = await walk([[-20, 6], [-31, 7], [-38, 3], [-56, -8], [-58, -16], [-58.5, -25]], { jump: true });
+await walk([[-20, 6], [-31, 7], [-38, 3], [-56, -8], [-58, -16]], { jump: true });
+r = await walk([[-58.5, -26.6]], { walk: true });
 check(r.d < 1.5, `reached the rubble (${r.x}, ${r.y}, ${r.z})`);
+check(await waitFor(() => document.getElementById('prompt').textContent.includes('しらべる（緑の岩くず）'), 5000), 'rubble is in interaction range');
 await act();
 check(!(await S()).flags.dummy && !(await G((G) => G.world.things.find((t) => t.id === 'rubble').broken)), 'bare hands cannot break the green rubble');
 await G((G) => G.silica.root.position.copy(G.player.pos).add({ x: 1, y: 0, z: 1 }));
@@ -152,6 +166,7 @@ await G((G) => G.onAction()); await page.waitForTimeout(200);
 check(await pick('銅線でつなぐ'), 'west joint: copper wire');
 check((await S()).gaps.gapA === 'wire', 'west joint conducts');
 r = await walk([[sp.gapB[0], sp.gapB[1] + 1.5]]);
+check(r.d < 1.6, `walked from the west joint to the east joint (${r.x}, ${r.y}, ${r.z})`);
 await G((G) => { G.cupra.root.position.copy(G.player.pos).add({ x: 1, y: 0, z: 1 }); });
 await G((G) => G.onAction()); await page.waitForTimeout(200);
 check(await pick('キュプラ、ここに立って'), 'east joint: Cupra stands in it');
@@ -175,16 +190,38 @@ await shot('07-end');
 check((await page.textContent('#end')).includes('第2章'), 'end card shows chapter 2');
 
 console.log('save / continue / other keys');
-await G((G) => G.persist());
+// Recreate a save from the old build during the power cutscene, with SiC saved too.
+await G((G) => {
+  Object.assign(G.S, { form: 'sic' });
+  G.S.partners.silica = 'merged';
+  G.S.partners.cupra = 'wait';
+  G.S.waitAt.cupra = [G.spots.gapB.x, G.spots.gapB.y];
+  G.persist();
+});
 await page.goto(BASE + 'chapter2/?auto&debug');
 await page.waitForTimeout(2500);
 check(await page.isVisible('#bCont'), 'つづきから is offered');
 await page.click('#bCont');
 check(await waitFor((G) => G.S.flags.power && G.S.flags.cupra, 20000), 'continue restores progress');
+check(await G((G) => G.S.form === 'sic' && !G.silica.root.visible), 'merged Silica is hidden after continue');
+check(await G((G) => G.S.partners.cupra === 'follow' && !G.S.waitAt.cupra), 'powered legacy save releases Cupra after continue');
 const keys = await page.evaluate(() => ({ a: localStorage.getItem('element118.save'), c: localStorage.getItem('element118.ch1.save') }));
 check(keys.a === '{"probe":2}' && keys.c === '{"probe":1}', 'the 2D and chapter-1 saves are untouched');
 const ri = await G((G) => G.renderInfo);
 check(ri.calls < 900, `draw calls ${ri.calls}`);
+
+await page.goto(BASE + 'chapter1/?skip&auto&debug');
+await page.click('#bNew');
+await page.evaluate(() => {
+  const h = window.__ch1;
+  h.S.flags.reveal = true;
+  h.player.teleport(132, 78);
+});
+const nextChapter = page.getByRole('link', { name: '第2章へ進む' });
+await nextChapter.waitFor({ state: 'visible', timeout: 30000 });
+await nextChapter.click();
+check(await page.waitForURL('**/chapter2/').then(() => true), 'Chapter 1 ending links to Chapter 2');
+check(await page.isVisible('#bCont'), 'following the link preserves the existing Chapter 2 save');
 
 check(!errors.length, errors.length ? `errors: ${errors.slice(0, 3).join(' | ')}` : 'no errors');
 await b.close();
