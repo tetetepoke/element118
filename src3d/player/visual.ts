@@ -460,14 +460,24 @@ export class ProceduralCarbon implements CharacterVisual {
   private t = 0;
   private formT = 0; // 0 normal … 1 SiC
   private readonly baseScale: number;
+  private readonly normalTunicColor: THREE.Color;
+  private readonly armourTunicColor = new THREE.Color(0x22262e);
 
   constructor(opts: { smooth?: boolean; scale?: number } = {}) {
     this.baseScale = opts.scale ?? 1;
     this.root.scale.setScalar(this.baseScale);
-    this.body = buildBody({ skin: 0xf2c9a0, hair: 0x4a2f2c, tunic: 0x2a201c, pants: 0x332620, boots: 0x6e4224, sleeve: 0x2e2420, glove: 0x5a3a26, hairStyle: 'spiky', smooth: opts.smooth, headScale: opts.smooth ? 1.12 : undefined });
+    const detailed = opts.smooth === true;
+    this.body = buildBody({
+      skin: 0xf2c9a0, hair: 0x4a2f2c, tunic: detailed ? 0x384e5b : 0x2a201c,
+      pants: detailed ? 0x45454a : 0x332620, boots: 0x6e4224,
+      sleeve: detailed ? 0x415865 : 0x2e2420, glove: 0x5a3a26,
+      hairStyle: detailed ? 'swept' : 'spiky', smooth: detailed, headScale: detailed ? 0.91 : undefined,
+    });
+    this.normalTunicColor = this.body.tunicMat.color.clone();
     this.anim = new BodyAnimator(this.body);
     this.root.add(this.body.root);
     const b = this.body;
+    if (detailed) b.head.position.y -= 0.055;
     const lock = mesh(opts.smooth ? softClump(0.08, 0.3) : bentCone(0.07, 0.3, -0.12, 5), std(0xe8963e, opts.smooth ? { roughness: 0.6 } : {}), b.head); // orange lock
     lock.position.set(0.16, 0.26, 0.14);
     lock.rotation.set(0.3, 0, -0.6);
@@ -476,17 +486,22 @@ export class ProceduralCarbon implements CharacterVisual {
     const mp = maskG.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < mp.count; i++) {
       const y = mp.getY(i), x = mp.getX(i);
-      if (y < -0.05) mp.setZ(i, mp.getZ(i) + (-y - 0.05) * 0.5 * Math.max(0, 1 - Math.abs(x) * 2.2));
+      const z = mp.getZ(i);
+      const jaw = THREE.MathUtils.smoothstep(-y, 0.015, 0.23);
+      const chin = Math.max(0, -y - 0.05) * Math.max(0, 1 - Math.abs(x) * 2.2);
+      if (detailed) mp.setXYZ(i, x * (1 - 0.19 * jaw), y - 0.029 * jaw, z + chin * 0.62);
+      else mp.setZ(i, z + chin * 0.5);
     }
     maskG.computeVertexNormals();
     const mask = mesh(maskG, new THREE.MeshStandardMaterial({ map: maskTexture(opts.smooth), roughness: opts.smooth ? 0.59 : 0.45, side: THREE.DoubleSide, ...(opts.smooth ? surfaceBump('ceramic', 0.014) : {}) }), b.head);
     mask.position.set(0, -0.01, 0.045);
-    mask.scale.set(1.05, 1.08, 1.12);
+    mask.scale.set(detailed ? 1 : 1.05, detailed ? 1.11 : 1.08, 1.12);
     const hornM = std(0xf6f1e8, { roughness: 0.35 });
     for (const sx of [1, -1]) {
       const horn = mesh(bentCone(0.055, 0.3, -0.12, 8), hornM, b.head);
       horn.position.set(sx * 0.19, 0.27, 0.2);
       horn.rotation.set(-0.35, 0, sx * -0.42);
+      if (detailed) horn.scale.set(0.81, 0.82, 0.84);
       const tip = mesh(new THREE.ConeGeometry(0.03, 0.08, 6), std(0xde5c3e), horn);
       tip.position.set(0, 0.29, -0.11);
       tip.rotation.x = -0.6;
@@ -502,6 +517,19 @@ export class ProceduralCarbon implements CharacterVisual {
     const tail = mesh(new THREE.BoxGeometry(0.1, 0.24, 0.03), scarfM, b.chest);
     tail.position.set(0.1, 0.5, 0.18);
     tail.rotation.set(0.2, 0, -0.2);
+    if (detailed) {
+      // Raised piping follows the opening of the coat and remains readable from the gameplay camera.
+      const seamMat = std(0xb39763, { roughness: 0.87 });
+      for (const side of [-1, 1]) {
+        const seam = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(side * 0.115, 0.59, 0.142),
+          new THREE.Vector3(side * 0.062, 0.43, 0.207),
+          new THREE.Vector3(side * 0.061, 0.19, 0.175),
+          new THREE.Vector3(side * 0.083, -0.13, 0.196),
+        ]);
+        mesh(new THREE.TubeGeometry(seam, 12, 0.008, 5, false), seamMat, b.chest);
+      }
+    }
     // ragged cape
     this.cape = new Cape(0xead6a4);
     this.cape.mesh.position.set(0, 0.62, -0.17);
@@ -577,7 +605,7 @@ export class ProceduralCarbon implements CharacterVisual {
       o.visible = e > 0.001;
       o.scale.copy(o.userData.scale as THREE.Vector3).multiplyScalar(Math.max(0.0001, e));
     }
-    this.body.tunicMat.color.setHex(this.formT > 0.5 ? 0x22262e : 0x2a201c);
+    this.body.tunicMat.color.copy(this.formT > 0.5 ? this.armourTunicColor : this.normalTunicColor);
     this.root.scale.setScalar(this.baseScale * (1 + this.formT * 0.08));
   }
 
