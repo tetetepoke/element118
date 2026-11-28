@@ -5,14 +5,16 @@ import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 mkdirSync('test-output', { recursive: true });
 const BASE = process.env.BASE ?? 'http://localhost:4173/element118/';
-const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const page = await b.newPage({ viewport: { width: 1280, height: 720 } });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await b.newPage(process.env.SKIP_SCREENSHOTS
+  ? { viewport: { width: 800, height: 500 }, deviceScaleFactor: 0.65 }
+  : { viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 let fails = 0;
 const check = (ok, msg) => { console.log(`  ${ok ? 'ok' : 'FAIL'} ${msg}`); if (!ok) fails++; };
-const shot = (n) => page.screenshot({ path: `test-output/ch1-${n}.png` });
+const shot = (n) => process.env.SKIP_SCREENSHOTS ? Promise.resolve() : page.screenshot({ path: `test-output/ch1-${n}.png` });
 
 // other games' saves must survive
 await page.goto(BASE);
@@ -82,12 +84,13 @@ const cityWalk = await walk([[22, 60], [27, 50], [31, 40], [33, 33], [33, 25], [
 check(cityWalk.d < 2, `walked down the ramp and over the bridge to the plaza (${cityWalk.d.toFixed(1)}m left)`);
 check(await waitFor((G) => G.S.flags.city_talk), 'plaza conversation (外？ / 外って何？)');
 await idle();
-await walk([[30, 12], [34.5, 9.5]]);
+// Go around the vendor and the market stall before approaching the elder.
+await walk([[13, 12], [19, 11], [28, 11], [35, 9]], { tol: 0.4 });
 await act();
 check((await S()).flags.elder, 'elder: 根は、上から来る → MISSION 青い根を追う + title');
 
 console.log('researcher: SCAN → HARVEST → CREATE');
-await walk([[10, 6], [-10, 6], [-24, 1.5]]);
+await walk([[29, 5], [14, 2], [3, 1], [-11, 2], [-24, 1.5]], { tol: 0.55 });
 await act();
 check((await S()).k.scan, 'MATERIAL SCAN unlocked');
 for (const [x, z] of [[-20, 9.5], [-30, 11.5], [-27, 0]]) {
@@ -198,10 +201,10 @@ console.log('return visits: places that were closed before');
 await tp(25, 106); await G((G) => G.onScan()); await closePanels(); await idle();
 await tp(33, 106.5); await G((G) => G.onScan()); await closePanels(); await idle();
 check((await G((G) => G.S.k.el.Fe)) === 2, 'back in the dump: scrap metal + rusty plate → Fe understood');
-await tp(-8, 124.5);
-const cv = await walk([[-11.5, 125]]);
+// Start at the lower cave mouth, below the ledge above the boulder.
+await tp(-12.3, 125.4);
 await act();
-check((await S()).broken.includes('cave_boulder'), `the dump's hard boulder breaks now (SiC) at ${cv.x.toFixed(1)}`);
+check((await S()).broken.includes('cave_boulder'), "the dump's hard boulder breaks now (SiC)");
 await walk([[-24, 127], [-28.5, 127.2]]);
 await act();
 check((await S()).flags.fragment, 'found the white fragment (someone fell before)');
