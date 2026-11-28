@@ -10,7 +10,7 @@ import { input, endFrame, initKeyboardMouse, initTouch, bindButton, bindAction, 
 import type { ActionName } from '../core/inputConfig';
 import { ThirdPersonCamera, CAMERA_TUNING } from '../core/camera';
 // chapter 1 framing: a little lower, over Carbon's shoulder, Carbon a bit below the centre, more world ahead
-Object.assign(CAMERA_TUNING, { distance: 4.2, pivotHeight: 1.2, lookAbove: 1.05, pitch: 0.1, minPitch: -0.35 });
+Object.assign(CAMERA_TUNING, { distance: 5.1, pivotHeight: 0.68, lookAbove: 0.48, pitch: 0.15, minPitch: -0.35 });
 import { PlayerController } from '../player/controller';
 import { ProceduralCarbon, ProceduralSilica } from '../player/visual';
 import { CollisionDebug } from '../world/collisionDebug';
@@ -96,7 +96,8 @@ const crystalLight = new THREE.PointLight(0x5ab8ff, 6, 7, 1.6);
 scene.add(crystalLight);
 
 // ── characters ──
-const carbon = new ProceduralCarbon({ smooth: true });
+const CARBON_SCALE = 0.5;
+const carbon = new ProceduralCarbon({ smooth: true, scale: CARBON_SCALE });
 scene.add(carbon.root);
 const player = new PlayerController(carbon, world.colliders);
 const silica = new ProceduralSilica({ smooth: true });
@@ -119,7 +120,8 @@ const blob = (() => {
   grd.addColorStop(1, 'rgba(0,0,0,0)');
   c.fillStyle = grd;
   c.fillRect(0, 0, 64, 64);
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
+  const shadowSize = 1.2 * CARBON_SCALE;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(shadowSize, shadowSize).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
   scene.add(m);
   return m;
 })();
@@ -1111,6 +1113,7 @@ let shake = 0;
 const fpsA: number[] = [];
 const debugOn = params.has('debug');
 const lightOrder = world.lights.map((l, i) => ({ i, d: 0 }));
+let hideCarbonNearCamera = false;
 function frame(now: number) {
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
@@ -1219,7 +1222,7 @@ function frame(now: number) {
     cam.update(dt, player.pos, player.moving, player.facing);
     camPos.copy(camera.position);
     colDebug.update(dt, { pos: player.pos, radius: MOVE.radius, height: MOVE.height }, { pivot: cam.pivotPoint, cam: camera.position, radius: CAMERA_TUNING.radius });
-    camLook.copy(player.pos).add(new THREE.Vector3(0, 1.2, 0));
+    camLook.copy(cam.pivotPoint);
   }
   // safety net (cut-scene cameras too): never above the cave ceiling
   const cy = ceilAt(camera.position.x, camera.position.z) - 0.6;
@@ -1255,7 +1258,10 @@ function frame(now: number) {
   // contact shadow
   const gy = world.colliders.topAt(player.pos.x, player.pos.z, 0);
   blob.position.set(player.pos.x, Math.min(gy, player.pos.y) + 0.04, player.pos.z);
-  blob.visible = carbon.root.visible && !cutscene;
+  // Tight walls still shorten the orbit. Keep Carbon out of the render while the lens is too close.
+  // A small gap between thresholds avoids flickering as the camera moves along a wall.
+  hideCarbonNearCamera = !cutscene && !cine && cam.distance < (hideCarbonNearCamera ? 1.15 : 0.95);
+  blob.visible = carbon.root.visible && !cutscene && !hideCarbonNearCamera;
 
   // prompts and buttons
   const t = !cutscene && !ui.busy() ? nearest(isActionable) : null;
@@ -1276,7 +1282,13 @@ function frame(now: number) {
   // autosave now and then
   if (flag('wake') && T % 15 < dt) persist();
   cullFar(dt);
-  renderer.render(scene, camera);
+  const carbonVisible = carbon.root.visible;
+  if (hideCarbonNearCamera) carbon.root.visible = false;
+  try {
+    renderer.render(scene, camera);
+  } finally {
+    carbon.root.visible = carbonVisible;
+  }
   endFrame();
   requestAnimationFrame(frame);
 }
