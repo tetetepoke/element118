@@ -1,9 +1,11 @@
 // Builds the chapter-1 world: cave meshes, the blue roots, props, people, creatures and every
 // interactable "thing". Logic (what happens) is in main.ts + game/*; this file only places things.
 import * as THREE from 'three';
+import { caveCanopy, caveWallLife } from '../../world/caveLife';
+import { addCaveHouseholds } from '../../world/caveHousehold';
 import { ColliderWorld } from '../../world/colliders';
 import { addFieldObject } from '../../world/fieldObjects';
-import { buildCaveMeshes, FLOOR_SEG, heightAt, SPOTS, RIVER, CHASM, CORRIDORS, ZONES, vnoise } from './cavern';
+import { buildCaveMeshes, FLOOR_SEG, heightAt, ceilAt, SPOTS, RIVER, CHASM, CORRIDORS, ZONES, vnoise } from './cavern';
 import { buildDumpProps } from './dumpProps';
 import { createFungusGeometries, createGlowPlantGeometry } from './fungusDetails';
 import { Npc, Crawler, Snail, Hakobi, FishSchool, glowMotes, type NpcLook } from './actors';
@@ -670,8 +672,17 @@ export function buildWorld() {
   cache('cache_city', 25, 22, 'stone', 'sharp_stone');
   cache('cache_fungus', -67, -77, 'fiber', 'fiber');
 
+  caveCanopy(root, [
+    [[2, 108], [7, 106], [12, 108], [17, 112]],
+    [[-8, 13], [2, 11], [11, 16], [22, 14]],
+    [[-74, -87], [-67, -81], [-59, -84], [-53, -87]],
+    [[96, -24], [101, -19], [108, -19], [113, -14]],
+  ], g, ceilAt, lights);
+  const updateWallLife = caveWallLife(root, ZONES.filter((zone) => ['dump', 'city', 'fungus', 'crystal'].includes(zone.id)), g);
+  addCaveHouseholds(root, colliders, g, [[19, 24], [28, 11], [-13, 9]]);
+
   return {
-    root, colliders, things, lights, npcs, crawlers, snails, hakobi: hak, crane, craneArm: arm, wakeRoot,
+    root, colliders, things, lights, npcs, updateWallLife, crawlers, snails, hakobi: hak, crane, craneArm: arm, wakeRoot,
     doors: { gateL: doorL, gateR: doorR, emblem, socket, farLights, ante: door },
     update(t: number, dt: number) { for (const u of updaters) u(t, dt); },
   };
