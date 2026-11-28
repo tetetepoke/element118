@@ -12,7 +12,8 @@ import { buildWorld, type Thing } from './world/build';
 import { input, endFrame, initKeyboardMouse, initTouch, bindButton, bindAction, pollInput, onDeviceChange, onGamepad, getLastDevice, padLabel, applySettings, settings as inputSettings } from '../core/input';
 import type { ActionName } from '../core/inputConfig';
 import { ThirdPersonCamera, CAMERA_TUNING } from '../core/camera';
-Object.assign(CAMERA_TUNING, { distance: 4.2, pivotHeight: 1.2, lookAbove: 1.05, pitch: 0.1, minPitch: -0.35 });
+import { CHAPTER_CAMERA, CHAPTER_CARBON_SCALE, CHAPTER_MOVE_SPEED } from '../core/chapterPresentation';
+Object.assign(CAMERA_TUNING, CHAPTER_CAMERA);
 import { PlayerController, TUNING as MOVE } from '../player/controller';
 import { ProceduralCarbon, ProceduralSilica } from '../player/visual';
 import { CollisionDebug } from '../world/collisionDebug';
@@ -93,11 +94,12 @@ const crystalLight = new THREE.PointLight(0x5ab8ff, 6, 7, 1.6);
 scene.add(crystalLight);
 
 // ── characters ──
-const carbon = new ProceduralCarbon({ smooth: true });
+const carbon = new ProceduralCarbon({ smooth: true, scale: CHAPTER_CARBON_SCALE });
 scene.add(carbon.root);
 const cuOverlay = buildCuOverlay();
 carbon.root.add(cuOverlay);
 const player = new PlayerController(carbon, world.colliders);
+player.speedMul = CHAPTER_MOVE_SPEED;
 const silica = new ProceduralSilica({ smooth: true });
 scene.add(silica.root);
 const cupra = new ProceduralCupra();
@@ -114,7 +116,8 @@ const blob = (() => {
   const cv = document.createElement('canvas'); cv.width = cv.height = 64;
   const c = cv.getContext('2d')!; const grd = c.createRadialGradient(32, 32, 0, 32, 32, 32);
   grd.addColorStop(0, 'rgba(0,0,0,0.6)'); grd.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = grd; c.fillRect(0, 0, 64, 64);
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
+  const shadowSize = 1.2 * CHAPTER_CARBON_SCALE;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(shadowSize, shadowSize).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
   scene.add(m); return m;
 })();
 
@@ -613,6 +616,11 @@ function useGap(t: Thing) {
 }
 async function powerOn() {
   await scene_(async () => {
+    const releaseCupra = S.partners.cupra === 'wait';
+    if (releaseCupra) {
+      S.partners.cupra = 'follow';
+      delete S.waitAt.cupra;
+    }
     setFlag('power');
     const p = SPOTS.panels;
     setCine(p.x, heightAt(p.x, p.y - 12) + 6, p.y + 6, p.x, heightAt(p.x, p.y) + 2, p.y - 6, true);
@@ -628,7 +636,7 @@ async function powerOn() {
     await wait(2000);
     await ui.say('カーボン', '昇降機の灯がついた。……上へ行ける。');
     // once powered, the joints latch: Cupra can leave her post
-    if (S.partners.cupra === 'wait') { S.partners.cupra = 'follow'; ui.toast('キュプラ「つながった線は、もう大丈夫」'); }
+    if (releaseCupra) ui.toast('キュプラ「つながった線は、もう大丈夫」');
   });
   persist();
 }
@@ -987,12 +995,30 @@ function applySave() {
   for (const id of S.broken) { const t = world.things.find((k) => k.id === id); if (t) breakThing(t, true); }
   if (S.form === 'sic') { carbon.setForm('sic'); $('form').textContent = 'SiC FORM'; $('form').style.display = 'inline-block'; }
   if (S.form === 'cu') { cuOverlay.visible = true; $('form').textContent = 'Cu LINK'; $('form').style.display = 'inline-block'; }
-  for (const w of ['silica', 'cupra'] as Who[]) if (S.partners[w] === 'follow' || S.partners[w] === 'wait') { vis(w).root.visible = true; vis(w).root.position.copy(player.pos).add(new THREE.Vector3(w === 'silica' ? 1.4 : -1.4, 0, 1.4)); }
   if (flag('cupra')) { world.colliders.list.find((c) => c.id === 'geode')!.enabled = false; world.parts.geode.children.forEach((m, i) => { if (i < 18) m.position.multiplyScalar(1.6); }); for (const b of world.bugs) b.home.set(SPOTS.geode.x - 6, 0, SPOTS.geode.y + 6); }
-  if (flag('power')) powerT = 1;
+  if (flag('power')) {
+    powerT = 1;
+    // Older saves could record power before releasing Cupra from the joint.
+    if (S.partners.cupra === 'wait') {
+      S.partners.cupra = 'follow';
+      delete S.waitAt.cupra;
+    }
+  }
   if (flag('record')) plateGlow = 1;
   gateClose = 1;
   if (S.pos) player.teleport(S.pos[0], S.pos[2]);
+  for (const w of ['silica', 'cupra'] as Who[]) {
+    const { root } = vis(w);
+    const mode = S.partners[w];
+    root.visible = mode === 'follow' || mode === 'wait';
+    if (!root.visible) continue;
+    const at = mode === 'wait' ? S.waitAt[w] : undefined;
+    if (at) root.position.set(at[0], world.colliders.topAt(at[0], at[1]), at[1]);
+    else {
+      root.position.copy(player.pos).add(new THREE.Vector3(w === 'silica' ? 1.4 : -1.4, 0, 1.4));
+      root.position.y = world.colliders.topAt(root.position.x, root.position.z);
+    }
+  }
   safe.copy(player.pos);
   bBagShow();
   updateMission();
@@ -1001,6 +1027,7 @@ const bBagShow = () => $('bBagTop').classList.remove('hide');
 
 // ── main loop ──
 let last = performance.now(), T = 0, shake = 0;
+let hideCarbonNearCamera = false;
 const fpsA: number[] = [];
 const debugOn = params.has('debug');
 const lightOrder = world.lights.map((_, i) => ({ i, d: 0 }));
@@ -1027,6 +1054,7 @@ function frame(now: number) {
   const { forward, right } = cam.basis();
   const free = !cutscene && !busy && !fx.frozen;
   if (!cutscene) {
+    for (const n of world.npcs) n.syncCollider();
     if (!free) player.locked = true; else if (!fx.active) player.locked = false;
     const steps = Math.max(1, Math.ceil(dt / (1 / 30)));
     if (!fx.frozen) for (let i = 0; i < steps; i++) { player.update(dt / steps, input, forward, right); if (i === 0) input.jump = false; }
@@ -1065,7 +1093,7 @@ function frame(now: number) {
   }
   if (farOn >= 0) { farOn = Math.min(1, farOn + dt * 0.4); farLights.material.opacity = farOn * 0.9; }
 
-  for (const n of world.npcs) n.update(dt, heightAt);
+  for (const n of world.npcs) n.update(dt, heightAt, cutscene ? undefined : player.pos);
   for (const b of world.bugs) b.update(dt, heightAt);
   world.update(T, dt);
   if (T % 7 < dt) sfx.drip();
@@ -1078,7 +1106,7 @@ function frame(now: number) {
     cam.update(dt, player.pos, player.moving, player.facing);
     camPos.copy(camera.position);
     colDebug.update(dt, { pos: player.pos, radius: MOVE.radius, height: MOVE.height }, { pivot: cam.pivotPoint, cam: camera.position, radius: CAMERA_TUNING.radius });
-    camLook.copy(player.pos).add(new THREE.Vector3(0, 1.2, 0));
+    camLook.copy(cam.pivotPoint);
   }
   const cy = ceilAt(camera.position.x, camera.position.z) - 0.6;
   if (camera.position.y > cy) camera.position.y = cy;
@@ -1101,7 +1129,8 @@ function frame(now: number) {
   }
   const gy = world.colliders.topAt(player.pos.x, player.pos.z, 0);
   blob.position.set(player.pos.x, Math.min(gy, player.pos.y) + 0.04, player.pos.z);
-  blob.visible = carbon.root.visible && !cutscene;
+  hideCarbonNearCamera = !cutscene && !cine && cam.distance < (hideCarbonNearCamera ? 1.15 : 0.95);
+  blob.visible = carbon.root.visible && !cutscene && !hideCarbonNearCamera;
 
   const t = !cutscene && !busy ? nearest(isActionable) : null;
   const scanT = !cutscene ? nearest((k) => k.kind !== 'npc', 4) : null;
@@ -1117,9 +1146,15 @@ function frame(now: number) {
   $('bForm').textContent = S.form !== 'normal' ? 'BREAK' : 'BOND';
   $('bCodex').classList.remove('hide');
   if (debugOn) { const fps = fpsA.length / fpsA.reduce((a, b) => a + b, 0); $('debug').textContent = `${fps.toFixed(0)}fps (${player.pos.x.toFixed(1)}, ${player.pos.y.toFixed(1)}, ${player.pos.z.toFixed(1)}) ${lastZone?.id ?? ''}`; }
-  if (flag('start') && T % 15 < dt) persist();
+  if (!cutscene && !fx.active && flag('start') && T % 15 < dt) persist();
   cullFar(dt);
-  renderer.render(scene, camera);
+  const carbonVisible = carbon.root.visible;
+  if (hideCarbonNearCamera) carbon.root.visible = false;
+  try {
+    renderer.render(scene, camera);
+  } finally {
+    carbon.root.visible = carbonVisible;
+  }
   endFrame();
   requestAnimationFrame(frame);
 }

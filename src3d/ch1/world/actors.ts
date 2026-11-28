@@ -125,7 +125,8 @@ export class Npc {
   syncCollider() {
     if (!this.collider) return;
     const { x, y, z } = this.root.position;
-    Object.assign(this.collider, { x, z, bottom: y, top: y + this.height, enabled: this.root.visible });
+    // Render culling can hide a person without removing them from the world.
+    Object.assign(this.collider, { x, z, bottom: y, top: y + this.height });
   }
   walkTo(p: THREE.Vector3 | null) { this.target = p ? p.clone() : null; }
   setWander(home: THREE.Vector3, r: number) { this.wander = { home: home.clone(), r, wait: Math.random() * 3 }; }
@@ -153,7 +154,7 @@ export class Npc {
         const x = p.x + (dx / d) * sp, z = p.z + (dz / d) * sp;
         const y = groundY(x, z);
         const gap = this.collider?.r ?? 0;
-        const blocked = player && this.root.visible && player.y < y + this.height && player.y + TUNING.height > y
+        const blocked = player && this.collider?.enabled && player.y < y + this.height && player.y + TUNING.height > y
           && Math.hypot(x - player.x, z - player.z) < gap + TUNING.radius
           && Math.hypot(x - player.x, z - player.z) < Math.hypot(p.x - player.x, p.z - player.z);
         if (!blocked) {

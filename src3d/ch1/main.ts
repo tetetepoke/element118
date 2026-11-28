@@ -9,8 +9,9 @@ import { buildWorld, type Thing } from './world/build';
 import { input, endFrame, initKeyboardMouse, initTouch, bindButton, bindAction, pollInput, onDeviceChange, onGamepad, getLastDevice, padLabel, applySettings, settings as inputSettings } from '../core/input';
 import type { ActionName } from '../core/inputConfig';
 import { ThirdPersonCamera, CAMERA_TUNING } from '../core/camera';
+import { CHAPTER_CAMERA, CHAPTER_CARBON_SCALE, CHAPTER_MOVE_SPEED } from '../core/chapterPresentation';
 // chapter 1 framing: a little lower, over Carbon's shoulder, Carbon a bit below the centre, more world ahead
-Object.assign(CAMERA_TUNING, { distance: 5.1, pivotHeight: 0.68, lookAbove: 0.48, pitch: 0.15, minPitch: -0.35 });
+Object.assign(CAMERA_TUNING, CHAPTER_CAMERA);
 import { PlayerController } from '../player/controller';
 import { ProceduralCarbon, ProceduralSilica } from '../player/visual';
 import { CollisionDebug } from '../world/collisionDebug';
@@ -96,11 +97,10 @@ const crystalLight = new THREE.PointLight(0x5ab8ff, 6, 7, 1.6);
 scene.add(crystalLight);
 
 // ── characters ──
-const CARBON_SCALE = 0.39;
-const carbon = new ProceduralCarbon({ smooth: true, scale: CARBON_SCALE });
+const carbon = new ProceduralCarbon({ smooth: true, scale: CHAPTER_CARBON_SCALE });
 scene.add(carbon.root);
 const player = new PlayerController(carbon, world.colliders);
-player.speedMul = 0.85;
+player.speedMul = CHAPTER_MOVE_SPEED;
 const silica = new ProceduralSilica({ smooth: true });
 silica.root.visible = false;
 scene.add(silica.root);
@@ -121,7 +121,7 @@ const blob = (() => {
   grd.addColorStop(1, 'rgba(0,0,0,0)');
   c.fillStyle = grd;
   c.fillRect(0, 0, 64, 64);
-  const shadowSize = 1.2 * CARBON_SCALE;
+  const shadowSize = 1.2 * CHAPTER_CARBON_SCALE;
   const m = new THREE.Mesh(new THREE.PlaneGeometry(shadowSize, shadowSize).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
   scene.add(m);
   return m;
@@ -732,7 +732,7 @@ function showEnd() {
   e.innerHTML = `<div class="c">CHAPTER 1　COMPLETE</div><div class="t">第1章　根は、上から来る</div>
     <div class="d">DISCOVERED　${d} / 118</div>
     <div class="q">なぜ、カーボンは降ってきたのか。<br>「また」とは、どういう意味なのか。<br>胸の結晶は、なぜ根と同じ色なのか。<br>青い根は、何なのか。<br>――上には、何があるのか。</div>
-    <div class="d">つづく</div><div><button class="bigbtn" id="bCont2">このまま探索する</button></div>`;
+    <div class="end-actions"><a class="bigbtn" href="../chapter2/">第2章へ進む</a><button class="bigbtn" id="bCont2">このまま探索する</button></div>`;
   e.style.display = 'flex';
   $('bCont2').onclick = async () => {
     e.style.display = 'none';
