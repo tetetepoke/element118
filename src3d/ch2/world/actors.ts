@@ -2,6 +2,7 @@
 // replace them later). Uses the shared body builder, but nothing here changes shared code.
 import * as THREE from 'three';
 import { buildBody, BodyAnimator, type MoveState } from '../../player/visual';
+import { surfaceBump } from '../../player/surfaceDetail';
 
 const std = (c: number, o: Partial<THREE.MeshStandardMaterialParameters> = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8, ...o });
 
@@ -17,7 +18,7 @@ export class ProceduralCupra {
     this.root.add(b.root);
     b.root.scale.setScalar(0.95 * scale);
     // patina cloak and copper bands
-    const cloak = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.75, 14, 1, true), std(0x2f8a6a, { side: THREE.DoubleSide, roughness: 0.9 }));
+    const cloak = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.75, 14, 1, true), std(0x2f8a6a, { side: THREE.DoubleSide, roughness: 0.9, ...surfaceBump('weave', 0.011) }));
     cloak.position.set(0, 0.32, -0.04);
     b.chest.add(cloak);
     for (const y of [0.15, 0.5]) {
@@ -27,7 +28,7 @@ export class ProceduralCupra {
       b.chest.add(band);
     }
     // half mask with "Cu" (like Carbon's "C"): something fell from above before
-    const mask = new THREE.Mesh(new THREE.SphereGeometry(0.33, 18, 10, -Math.PI / 2, Math.PI, 0, Math.PI / 2), std(0xf2f0ea, { roughness: 0.5 }));
+    const mask = new THREE.Mesh(new THREE.SphereGeometry(0.33, 18, 10, -Math.PI / 2, Math.PI, 0, Math.PI / 2), std(0xf2f0ea, { roughness: 0.59, ...surfaceBump('ceramic', 0.014) }));
     mask.rotation.x = -0.2;
     mask.position.set(0, 0.05, 0.02);
     b.head.add(mask);

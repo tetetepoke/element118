@@ -2,6 +2,7 @@
 // The controller only calls setState / setForm / playAction / update; any model can implement this —
 // the code-built placeholders below today, a GLB (see gltfCharacter.ts) later.
 import * as THREE from 'three';
+import { surfaceBump } from './surfaceDetail';
 
 export type MoveState = 'Idle' | 'Walk' | 'Run' | 'Jump' | 'Fall' | 'Land' | 'Climb' | 'Swim';
 
@@ -123,7 +124,9 @@ export function buildBody(o: BodyOpts): Body {
   const hips = new THREE.Group();
   hips.position.y = 0.74;
   root.add(hips);
-  const pantsM = std(o.pants), bootM = std(o.boots, { roughness: 0.65 }), wrapM = std(0x8a6a4a, { roughness: 0.95 });
+  const cloth = o.smooth ? surfaceBump('weave', 0.011) : {};
+  const leather = o.smooth ? surfaceBump('leather', 0.014) : {};
+  const pantsM = std(o.pants, cloth), bootM = std(o.boots, { roughness: 0.76, ...leather }), wrapM = std(0x8a6a4a, { roughness: 0.95, ...cloth });
   // legs: thigh + shin (knee joint), chunky boots with a slightly upturned toe
   const mkLeg = (x: number): Joint => {
     const j = new THREE.Group();
@@ -155,12 +158,24 @@ export function buildBody(o: BodyOpts): Body {
   // torso: a lathe-turned tunic — narrow neck, broad shoulders, cinched waist, flared hem
   const torso = new THREE.Group();
   hips.add(torso);
-  const tunicMat = std(o.tunic, { roughness: 0.9 });
+  const tunicMat = std(o.tunic, { roughness: 0.9, ...cloth });
   const prof = [
     [0.0, 0.66], [0.08, 0.66], [0.11, 0.62], [0.2, 0.58], [0.27, 0.52], [0.275, 0.44], [0.25, 0.3], [0.21, 0.16],
     [0.205, 0.06], [0.23, -0.04], [0.27, -0.13], [0.3, -0.2], [0.0, -0.2],
   ].map(([r, y]) => new THREE.Vector2(r, y));
-  const tunic = mesh(new THREE.LatheGeometry(prof, 16), tunicMat, torso);
+  const tunicGeometry = new THREE.LatheGeometry(prof, o.smooth ? 24 : 16);
+  if (o.smooth) {
+    const position = tunicGeometry.attributes.position;
+    for (let i = 0; i < position.count; i++) {
+      const x = position.getX(i), y = position.getY(i), z = position.getZ(i);
+      const angle = Math.atan2(x, z);
+      const hem = THREE.MathUtils.smoothstep(0.23 - y, 0, 0.43);
+      const fold = 1 + hem * (0.048 * Math.sin(7 * angle + y * 2) + 0.019 * Math.cos(11 * angle));
+      position.setXYZ(i, x * fold, y, z * fold);
+    }
+    tunicGeometry.computeVertexNormals();
+  }
+  const tunic = mesh(tunicGeometry, tunicMat, torso);
   tunic.scale.set(1, 1, 0.74);
   for (let i = 0; i < 8; i++) { // ragged hem tabs
     const a = (i / 8) * Math.PI * 2;
@@ -171,7 +186,7 @@ export function buildBody(o: BodyOpts): Body {
   const chest = new THREE.Group();
   torso.add(chest);
   // arms: upper + forearm (elbow joint) + glove
-  const sleeveM = std(o.sleeve), gloveM = std(o.glove, { roughness: 0.6 });
+  const sleeveM = std(o.sleeve, cloth), gloveM = std(o.glove, { roughness: 0.72, ...leather });
   const mkArm = (x: number): Joint => {
     const j = new THREE.Group();
     j.position.set(x, 0.52, 0);
@@ -202,7 +217,7 @@ export function buildBody(o: BodyOpts): Body {
   neck.position.y = 0.72;
   const skull = mesh(new THREE.SphereGeometry(0.34, 22, 16), std(o.skin), head);
   skull.scale.set(1, 0.95, 0.96);
-  const hairM = std(o.hair, o.smooth ? { roughness: 0.6 } : { roughness: 0.92, flatShading: true });
+  const hairM = std(o.hair, o.smooth ? { roughness: 0.66, ...surfaceBump('hair', 0.018) } : { roughness: 0.92, flatShading: true });
   if (o.headScale) head.scale.setScalar(o.headScale);
   const cap = mesh(new THREE.SphereGeometry(0.36, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.56), hairM, head);
   cap.position.set(0, 0.03, -0.03);
@@ -396,12 +411,26 @@ class Cape {
 }
 
 // ───────────────────────── Carbon (placeholder until the GLB exists) ─────────────────────────
-function maskTexture() {
+function maskTexture(detailed = false) {
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   const g = c.getContext('2d')!;
-  g.fillStyle = '#f6f1e8';
+  if (detailed) {
+    const glaze = g.createRadialGradient(111, 92, 30, 125, 127, 163);
+    glaze.addColorStop(0, '#fff9ec');
+    glaze.addColorStop(0.68, '#f0e7d8');
+    glaze.addColorStop(1, '#b9a795');
+    g.fillStyle = glaze;
+  } else g.fillStyle = '#f6f1e8';
   g.fillRect(0, 0, 256, 256);
+  if (detailed) {
+    // Small pits and scuffs beneath the painted markings.
+    for (let i = 0; i < 720; i++) {
+      const x = (i * 73 + i * i * 7) % 256, y = (i * 137 + i * i * 13) % 256;
+      g.fillStyle = i % 3 ? '#6e584111' : '#ffffff40';
+      g.fillRect(x, y, i % 5 === 0 ? 2 : 1, 1);
+    }
+  }
   g.fillStyle = '#de5c3e';
   g.fillRect(40, 64, 10, 44);
   g.fillRect(206, 150, 10, 30);
@@ -450,7 +479,7 @@ export class ProceduralCarbon implements CharacterVisual {
       if (y < -0.05) mp.setZ(i, mp.getZ(i) + (-y - 0.05) * 0.5 * Math.max(0, 1 - Math.abs(x) * 2.2));
     }
     maskG.computeVertexNormals();
-    const mask = mesh(maskG, new THREE.MeshStandardMaterial({ map: maskTexture(), roughness: 0.45, side: THREE.DoubleSide }), b.head);
+    const mask = mesh(maskG, new THREE.MeshStandardMaterial({ map: maskTexture(opts.smooth), roughness: opts.smooth ? 0.59 : 0.45, side: THREE.DoubleSide, ...(opts.smooth ? surfaceBump('ceramic', 0.014) : {}) }), b.head);
     mask.position.set(0, -0.01, 0.045);
     mask.scale.set(1.05, 1.08, 1.12);
     const hornM = std(0xf6f1e8, { roughness: 0.35 });
