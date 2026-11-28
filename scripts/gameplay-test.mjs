@@ -83,7 +83,11 @@ try {
     assert.ok(await evaluate((g, id) => g.S.defeated?.[id]?.drops.length > 0 &&
       !g.world.colliders.list.find((c) => c.id === id).enabled, enemyId), 'defeat disables the collider and produces loot');
     const drop = await evaluate((g, id) => g.S.defeated[id].drops[0], enemyId);
-    await page.locator('#bAct').tap();
+    const collect = page.locator('#bAct');
+    await page.waitForFunction(() => document.getElementById('bAct').textContent === '拾う');
+    if (await collect.isVisible()) await collect.tap();
+    else await page.keyboard.press('KeyE');
+    await page.waitForFunction(({ chapter, drop }) => window[`__ch${chapter}`].S.inv[drop] === 1, { chapter, drop });
     assert.equal(await evaluate((g, drop) => g.S.inv[drop], drop), 1);
     assert.ok(await evaluate((g, drop) => g.S.wildlifeMaterials.includes(drop) && !g.S.k.scanned.includes(drop), drop));
     await page.reload();

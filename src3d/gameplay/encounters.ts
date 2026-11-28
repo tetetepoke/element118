@@ -99,9 +99,13 @@ export function encounters(host: CombatHost) {
     return ground.waterAt(p.x, p.z) === null && (ground.ceilingAt?.(p.x, p.z) ?? Infinity) > p.y + 1.1;
   }
   const candidate = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const aim = new THREE.Vector3(), segment = new THREE.Vector3(), torso = new THREE.Vector3();
+  const worldToGrip = new THREE.Quaternion();
+  const shaftAxis = new THREE.Vector3(0, 1, 0);
   let activeState: EncounterSave | undefined;
   let attackDelay = 0, swing = 0, elapsed = 0, swingLength = 1, immunity = 0, safeTime = 0;
   let swingTool: Tool | null = null, connected = false;
+  let swingTarget: typeof enemies[number] | undefined;
 
   const defeated = () => (host.state().defeated ??= {});
   const fallen = (e: typeof enemies[number]) => defeated()[e.id];
@@ -235,6 +239,7 @@ export function encounters(host: CombatHost) {
       const e = combatTarget();
       if (!e || attackDelay > 0) return false;
       swingTool = host.tool();
+      swingTarget = e;
       swingLength = 0.61 / Math.max(0.45, swingTool?.stats.attackSpeed ?? 1);
       attackDelay = swingLength + 0.13;
       swing = swingLength;
@@ -259,7 +264,7 @@ export function encounters(host: CombatHost) {
       for (const e of enemies) {
         e.lootMarker.visible = false;
         const dead = fallen(e);
-        if (!dead) { if (e.usable) tickEnemy(e, Math.min(dt, 0.05)); continue; }
+        if (!dead) { if (e.usable) tickEnemy(e, dt); continue; }
         const x = dead.x ?? e.home.x, z = dead.z ?? e.home.z;
         if (dead.drops.length && Math.hypot(pos.x - x, pos.z - z) < 9) {
           e.lootMarker.position.set(x, ground.heightAt(x, z) + 0.08, z);
@@ -272,7 +277,7 @@ export function encounters(host: CombatHost) {
       const target = combatTarget(6);
       safeTime = target ? 0 : safeTime + dt;
       if (safeTime > 9 && (state.hp ?? MAX_HP) < MAX_HP) { state.hp = MAX_HP; host.save(); }
-      const status = lootTarget() ? 'E／調べる：素材を拾う' : target ? `${target.def.label} ${target.hp}/${target.def.hp}${target.phase === 'warn' ? '　攻撃予備動作！' : ''}` : '';
+      const status = lootTarget() ? 'E／調べる：素材を拾う' : target ? `${target.def.label} ${target.hp}/${target.def.hp}${target.phase === 'warn' ? `　攻撃予備動作！ ${target.def.attack}` : ''}` : '';
       const text = `HP ${state.hp ?? MAX_HP}/${MAX_HP}　${status}`;
       if (ui.textContent !== text) ui.textContent = text;
       swish.visible = false;
@@ -280,29 +285,42 @@ export function encounters(host: CombatHost) {
       swing -= dt;
       elapsed += dt;
       const q = elapsed / swingLength;
-      if (connected || q < 0.37 || q > 0.78 || host.tool() !== swingTool) return;
+      if (q < 0.37 || (elapsed - dt) / swingLength >= 0.78 || host.tool() !== swingTool) return;
       const hand = host.grip();
       const weapon = host.held();
       hand.getWorldPosition(a);
       const tip = weapon?.userData.attackTip as THREE.Vector3 | undefined;
-      if (weapon && tip) weapon.localToWorld(b.copy(tip));
+      if (weapon?.parent && tip) {
+        if (swingTarget && visible(swingTarget)) {
+          const target = swingTarget.model.position;
+          aim.copy(target).setY(target.y + swingTarget.def.height * 0.55).sub(a).normalize();
+          if (aim.lengthSq() > 0.001) {
+            weapon.parent.getWorldQuaternion(worldToGrip).invert();
+            weapon.quaternion.setFromUnitVectors(shaftAxis, aim.applyQuaternion(worldToGrip));
+          }
+        }
+        weapon.localToWorld(b.copy(tip));
+      }
       else if (weapon) weapon.localToWorld(b.set(0, Math.min(1.05, (swingTool?.stats.reach ?? 1) * 0.55), 0));
       else {
         const yaw = host.facing();
-        b.copy(a).add(new THREE.Vector3(Math.sin(yaw) * 0.32, 0, Math.cos(yaw) * 0.32));
+        b.copy(a).add(aim.set(Math.sin(yaw) * 0.32, 0, Math.cos(yaw) * 0.32));
       }
       swish.position.copy(b);
       swish.visible = true;
-      const segment = b.clone().sub(a);
+      if (connected) return;
+      segment.copy(b).sub(a);
+      torso.copy(pos).setY(pos.y + 0.38);
       for (const e of enemies) {
         if (!visible(e)) continue;
         const p = e.model.position;
         if (p.distanceToSquared(pos) > 9) continue;
-        c.set(p.x, THREE.MathUtils.clamp((a.y + b.y) / 2, p.y + 0.12, p.y + e.def.height - 0.05), p.z);
-        const on = THREE.MathUtils.clamp(c.clone().sub(a).dot(segment) / Math.max(segment.lengthSq(), 1e-6), 0, 1);
+        const horizontalLength = segment.x ** 2 + segment.z ** 2;
+        const on = THREE.MathUtils.clamp(((p.x - a.x) * segment.x + (p.z - a.z) * segment.z) / Math.max(horizontalLength, 1e-6), 0, 1);
         c.copy(a).addScaledVector(segment, on);
         if (Math.hypot(c.x - p.x, c.z - p.z) > e.def.radius + 0.16 || c.y < p.y - 0.09 || c.y > p.y + e.def.height + 0.12) continue;
-        if (!line(a, c.set(p.x, THREE.MathUtils.clamp(c.y, p.y + 0.12, p.y + e.def.height), p.z), e.collider)) continue;
+        c.set(p.x, THREE.MathUtils.clamp(c.y, p.y + 0.12, p.y + e.def.height), p.z);
+        if (!line(a, c, e.collider) || !line(torso, c, e.collider)) continue;
         connected = true;
         const style = swingTool?.design.kind ? WEAPONS[swingTool.design.kind].stat : swingTool ? bestStat(swingTool.stats) : 'impact';
         const power = Math.max(2, (swingTool?.stats.attack ?? (host.form() === 'sic' ? 10 : 5)) - e.def.armor);

@@ -24,19 +24,19 @@ export function registerWildlifeMaterials() {
 
 interface Creature {
   label: string; hp: number; damage: number; armor: number; speed: number; radius: number; height: number;
-  range: number; aim: number; windup: number; recovery: number; detection: number; leash: number;
+  attack: string; range: number; aim: number; windup: number; recovery: number; detection: number; leash: number;
   pattern: 'guard' | 'rush' | 'circle'; weakness: StatKey; color: number; glow: number;
   habitat: string; respawn: number; drops: readonly (readonly [item: string, chance: number])[];
 }
 export const CREATURES = {
   cave_vibration_guard: { label: 'シンドウムシ（縄張り個体）', hp: 16, damage: 8, armor: 1, speed: 1.25, radius: 0.39, height: 0.64,
-    range: 1.2, aim: 0.66, windup: 0.85, recovery: 1.05, detection: 4.8, leash: 6.3, pattern: 'guard', weakness: 'impact', color: 0x6f614a, glow: 0xe09a64,
+    attack: '体当たり', range: 1.2, aim: 0.66, windup: 0.85, recovery: 1.05, detection: 4.8, leash: 6.3, pattern: 'guard', weakness: 'impact', color: 0x6f614a, glow: 0xe09a64,
     habitat: '第七廃棄区・菌類の森の脇道', respawn: 65, drops: [['cave_claw', 1], ['cave_mycelium', 0.55], ['cave_membrane', 0.33]] },
   cave_patina_guard: { label: 'ロクショウムシ（縄張り個体）', hp: 25, damage: 12, armor: 3, speed: 1.65, radius: 0.47, height: 0.67,
-    range: 1.52, aim: 0.8, windup: 0.86, recovery: 1.2, detection: 5.3, leash: 6.9, pattern: 'rush', weakness: 'pierce', color: 0x376b53, glow: 0xd2b762,
+    attack: '角突き', range: 1.52, aim: 0.8, windup: 0.86, recovery: 1.2, detection: 5.3, leash: 6.9, pattern: 'rush', weakness: 'pierce', color: 0x376b53, glow: 0xd2b762,
     habitat: '緑の坑・緑青の洞の脇道', respawn: 85, drops: [['cave_shell', 1], ['cave_fang', 0.72], ['cave_membrane', 0.40]] },
   cave_light_guard: { label: 'ヒカリクイ（縄張り個体）', hp: 17, damage: 9, armor: 1, speed: 1.95, radius: 0.34, height: 0.51,
-    range: 1.16, aim: 0.63, windup: 0.65, recovery: 0.87, detection: 5.2, leash: 6.2, pattern: 'circle', weakness: 'cut', color: 0x626a43, glow: 0xc8f986,
+    attack: '横薙ぎ', range: 1.16, aim: 0.63, windup: 0.65, recovery: 0.87, detection: 5.2, leash: 6.2, pattern: 'circle', weakness: 'cut', color: 0x626a43, glow: 0xc8f986,
     habitat: '砂錫の沢・結晶層の脇道', respawn: 70, drops: [['cave_lantern', 1], ['cave_membrane', 0.52], ['cave_fang', 0.35]] },
 } as const satisfies Record<string, Creature>;
 

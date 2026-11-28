@@ -42,14 +42,24 @@ export function explorationMap(ground: Ground, colliders: ColliderWorld, layers:
   const coords = (x: number, z: number) => [Math.floor(x / CELL), Math.floor(z / CELL)] as const;
   const tx = (i: number) => (i + 0.5) * CELL;
   const visited = (x: number, z: number) => seen.has(key(...coords(x, z)));
+  function* displayedCells(fromX: number, fromZ: number, spanX: number, spanZ: number, fullMap: boolean) {
+    if (fullMap) {
+      for (const entry of seen) yield entry.split(':').map(Number);
+      return;
+    }
+    const [left, top] = coords(fromX, fromZ);
+    const [right, bottom] = coords(fromX + spanX, fromZ + spanZ);
+    for (let ix = left; ix <= right; ix++) for (let iz = top; iz <= bottom; iz++) {
+      if (seen.has(key(ix, iz))) yield [ix, iz];
+    }
+  }
   const draw = (canvas: HTMLCanvasElement, fromX: number, fromZ: number, spanX: number, spanZ: number, layer?: number) => {
     const ctx = canvas.getContext('2d')!;
     const sx = canvas.width / spanX, sz = canvas.height / spanZ;
     const px = (x: number) => (x - fromX) * sx, pz = (z: number) => (z - fromZ) * sz;
     ctx.fillStyle = '#101725';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    for (const entry of seen) {
-      const [ix, iz] = entry.split(':').map(Number);
+    for (const [ix, iz] of displayedCells(fromX, fromZ, spanX, spanZ, layer !== undefined)) {
       const x = tx(ix), z = tx(iz);
       if (x < fromX - CELL || z < fromZ - CELL || x > fromX + spanX + CELL || z > fromZ + spanZ + CELL) continue;
       const y = ground.heightAt(x, z);
@@ -113,6 +123,7 @@ export function explorationMap(ground: Ground, colliders: ColliderWorld, layers:
       player = { x, z, facing };
       goal = objective;
       const [cx, cz] = coords(x, z);
+      const py = ground.heightAt(x, z);
       for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) {
         if (a * a + b * b > 9) continue;
         const k = key(cx + a, cz + b);
@@ -122,7 +133,7 @@ export function explorationMap(ground: Ground, colliders: ColliderWorld, layers:
         for (let step = 1; step < steps; step++) {
           const u = step / steps, rx = x + (tx(cx + a) - x) * u, rz = z + (tx(cz + b) - z) * u;
           const ry = ground.heightAt(rx, rz);
-          if ((ground.ceilingAt?.(rx, rz) ?? Infinity) - ry < 1.45 || ry > ground.heightAt(x, z) + 4) {
+          if ((ground.ceilingAt?.(rx, rz) ?? Infinity) - ry < 1.45 || ry > py + 4) {
             occluded = true;
             break;
           }
