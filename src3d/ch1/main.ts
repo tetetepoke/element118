@@ -101,7 +101,7 @@ const carbon = new ProceduralCarbon({ smooth: true, scale: CHAPTER_CARBON_SCALE 
 scene.add(carbon.root);
 const player = new PlayerController(carbon, world.colliders);
 player.speedMul = CHAPTER_MOVE_SPEED;
-const silica = new ProceduralSilica({ smooth: true });
+const silica = new ProceduralSilica({ smooth: true, scale: CHAPTER_CARBON_SCALE });
 silica.root.visible = false;
 scene.add(silica.root);
 const fx = new BondFx();
@@ -628,7 +628,7 @@ function doBreak(): Promise<void> {
     sfx.chime(false);
     fx.playBreak({
       from: () => carbon.anchor(new THREE.Vector3()).setY(player.pos.y + 0.2),
-      to: () => new THREE.Vector3(at.x, at.y + 0.8, at.z),
+      to: () => new THREE.Vector3(at.x, at.y + 0.8 * CHAPTER_CARBON_SCALE, at.z),
       setProgress: (p) => carbon.setFormProgress('sic', p),
       silica: silica.root,
       onCommit: () => { S.form = 'normal'; S.partner = 'follow'; persist(); },

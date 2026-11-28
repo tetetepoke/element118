@@ -592,10 +592,11 @@ export class ProceduralSilica implements CharacterVisual {
   private cape: Cape;
   private body: Body;
   private t = 0;
-  constructor(opts: { smooth?: boolean } = {}) {
+  constructor(opts: { smooth?: boolean; scale?: number } = {}) {
     const b = buildBody({ skin: 0xf6dcc4, hair: 0xe6e8f0, tunic: 0xf0f0f4, pants: 0x4a3f6a, boots: 0xe0b040, sleeve: 0xe8e8f0, glove: 0x4a3f6a, hairStyle: 'swept', smooth: opts.smooth, headScale: opts.smooth ? 1.1 : undefined });
     this.body = b;
     this.anim = new BodyAnimator(b);
+    b.root.scale.setScalar(opts.scale ?? 1);
     this.root.add(b.root);
     const scarf = mesh(new THREE.TorusGeometry(0.17, 0.07, 8, 16), std(0x5a4a9a, { roughness: 0.8 }), b.chest);
     scarf.rotation.x = Math.PI / 2;
