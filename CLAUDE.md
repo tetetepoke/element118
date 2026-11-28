@@ -33,6 +33,7 @@
 
 実装ごとの資料（必要なときだけ）：
 - 3D第1章：`docs/CHAPTER1.md`
+- 3D第2章：`docs/CHAPTER2.md`
 - 3D技術試作：`docs/3D_PROTOTYPE.md`
 - 2Dステージ2：`docs/STAGE2_PLAN.md`
 - キャラクターの見た目：`docs/CHARACTER_DESIGN.md`
@@ -47,8 +48,8 @@ ELEMENT 118では、元素・化合物・混合物・合金・化学反応を混
 プレイヤー移動／衝突判定／カメラ／BOND／BREAK／元素能力／探索／UI／元素図鑑／スマートフォン操作／コントローラー操作／ストーリー進行
 
 既存の約束ごと：
-- 2D版（`/`）・3D技術試作（`/3d/`）・3D第1章（`/chapter1/`）は別ページ。指示がない限り他のページを変えない。
-- セーブキーは `element118.` で始める（2D：`element118.save`、3D試作：`element118.3d.*`、第1章：`element118.ch1.*`）。他のキーを読み書き・削除しない。`localStorage.clear()` は使わない。
+- 2D版（`/`）・3D技術試作（`/3d/`）・3D第1章（`/chapter1/`）・3D第2章（`/chapter2/`）は別ページ。指示がない限り他のページを変えない。
+- セーブキーは `element118.` で始める（2D：`element118.save`、3D試作：`element118.3d.*`、第1章：`element118.ch1.*`、第2章：`element118.ch2.*`）。他のキーを読み書き・削除しない。`localStorage.clear()` は使わない。
 - 正式な基準画像（`art/reference/*.png`）はJPEG化・再圧縮・縮小しない。
 - 入力はすべて InputManager（`src3d/core/input.ts`、設定は `src3d/core/inputConfig.ts`）を通す。デバイスごとに直接キャラクターを動かすコードを書かない。
 
