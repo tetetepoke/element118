@@ -3,6 +3,7 @@
 // Progress: the gate (south, +z) → the old adit → the miners' village → west (malachite) / east (tin
 // stream) → south-west deep vein / south-east power station → back to the big shaft and up.
 import * as THREE from 'three';
+import { caveSurface } from '../../world/caveSurface';
 import type { Ground } from '../../world/ground';
 
 export const HALF = 120;
@@ -196,8 +197,8 @@ export function buildMineMeshes(seg = FLOOR_SEG) {
   ceilG.setAttribute('color', new THREE.BufferAttribute(cc, 3));
   floorG.computeVertexNormals();
   ceilG.computeVertexNormals();
-  const floor = new THREE.Mesh(floorG, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
-  const ceiling = new THREE.Mesh(ceilG, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide }));
+  const floor = new THREE.Mesh(floorG, caveSurface());
+  const ceiling = new THREE.Mesh(ceilG, caveSurface(true));
   floor.name = 'floor';
   ceiling.name = 'ceiling';
   return { floor, ceiling };

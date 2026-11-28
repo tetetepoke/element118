@@ -3,6 +3,7 @@
 // There is no sky anywhere: the ceiling closes every open space.
 // Progress goes north (-z) and up: deepest = the dump (y 0), the upper gate is at y 62.
 import * as THREE from 'three';
+import { caveSurface } from '../../world/caveSurface';
 import type { Ground } from '../../world/ground';
 
 export const HALF = 160;
@@ -274,8 +275,8 @@ export function buildCaveMeshes(seg = 256) {
   ceilG.setAttribute('color', new THREE.BufferAttribute(cc, 3));
   floorG.computeVertexNormals();
   ceilG.computeVertexNormals();
-  const floor = new THREE.Mesh(floorG, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
-  const ceiling = new THREE.Mesh(ceilG, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide }));
+  const floor = new THREE.Mesh(floorG, caveSurface());
+  const ceiling = new THREE.Mesh(ceilG, caveSurface(true));
   floor.name = 'floor';
   ceiling.name = 'ceiling';
   return { floor, ceiling };
