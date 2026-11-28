@@ -430,8 +430,11 @@ export class ProceduralCarbon implements CharacterVisual {
   private glow: THREE.Sprite;
   private t = 0;
   private formT = 0; // 0 normal … 1 SiC
+  private readonly baseScale: number;
 
-  constructor(opts: { smooth?: boolean } = {}) {
+  constructor(opts: { smooth?: boolean; scale?: number } = {}) {
+    this.baseScale = opts.scale ?? 1;
+    this.root.scale.setScalar(this.baseScale);
     this.body = buildBody({ skin: 0xf2c9a0, hair: 0x4a2f2c, tunic: 0x2a201c, pants: 0x332620, boots: 0x6e4224, sleeve: 0x2e2420, glove: 0x5a3a26, hairStyle: 'spiky', smooth: opts.smooth, headScale: opts.smooth ? 1.12 : undefined });
     this.anim = new BodyAnimator(this.body);
     this.root.add(this.body.root);
@@ -546,7 +549,7 @@ export class ProceduralCarbon implements CharacterVisual {
       o.scale.copy(o.userData.scale as THREE.Vector3).multiplyScalar(Math.max(0.0001, e));
     }
     this.body.tunicMat.color.setHex(this.formT > 0.5 ? 0x22262e : 0x2a201c);
-    this.root.scale.setScalar(1 + this.formT * 0.08);
+    this.root.scale.setScalar(this.baseScale * (1 + this.formT * 0.08));
   }
 
   anchor(out: THREE.Vector3) {
