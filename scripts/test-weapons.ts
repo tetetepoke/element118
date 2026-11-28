@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Group, Vector3 } from 'three';
-import { adjustWeaponCarry, craftFromInventory, makeTool, toolMesh, type Tool, type ToolDesign } from '../src3d/ch1/game/craft';
+import { adjustWeaponCarry, craftFromInventory, makeTool, restoreTool, toolWear, toolMesh, type Tool, type ToolDesign } from '../src3d/ch1/game/craft';
 import { WEAPONS, type WeaponKind } from '../src3d/gameplay/weaponTypes';
 import { registerWildlifeMaterials } from '../src3d/gameplay/wildlifeData';
 
@@ -44,4 +44,17 @@ test('holding a spear down raises its tip without detaching from the glove', () 
   assert.ok(tip.y > 0.03);
   assert.equal(mesh.parent, glove);
   assert.equal(mesh.position.lengthSq(), 0);
+});
+
+test('durability follows parts, load and contact hardness and restores old wear', () => {
+  const loose = { head: 'heavy_stone', handle: 'stick', binding: null };
+  const tied = makeTool({ ...loose, binding: 'fiber' })!;
+  const stone = makeTool(loose)!;
+  assert.equal(stone.stats.limitingPart, 'binding');
+  assert.ok(tied.stats.durability > stone.stats.durability);
+  assert.ok(toolWear(tied, 10) > toolWear(tied, 2));
+  const restored = restoreTool({ design: tied.design, uses: 10, capacity: 20 })!;
+  assert.equal(restored.uses, Math.ceil(restored.stats.durability / 2));
+  assert.equal(restoreTool({ design: tied.design, uses: 3, capacity: tied.stats.durability })?.uses, 3);
+  assert.equal(restoreTool({ design: loose, uses: 1 })?.uses, 1);
 });

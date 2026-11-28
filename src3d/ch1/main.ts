@@ -29,7 +29,7 @@ import { viewerStats } from './itemViewer';
 import { sfx, startAudio } from './audio';
 import { ITEMS, MATERIALS, ELEMENTS, type ElementSymbol } from './game/materials';
 import { newKnowledge, unlockScan, noteScan, level, type KnowledgeState } from './game/knowledge';
-import { makeTool, toolMesh, partsNeeded, craftFromInventory, adjustWeaponCarry, type Tool, type ToolDesign } from './game/craft';
+import { restoreTool, toolWear, type SavedTool, toolMesh, partsNeeded, craftFromInventory, adjustWeaponCarry, type Tool, type ToolDesign } from './game/craft';
 import { canBreak, canHarvest, HANDS, STAT_JA, type Power } from './game/interact';
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -143,7 +143,7 @@ interface Save extends EncounterSave {
   v: 1;
   flags: Record<string, boolean>;
   inv: Record<string, number>;
-  tools: { design: ToolDesign; uses: number }[];
+  tools: SavedTool[];
   equipped: number | null;
   k: KnowledgeState;
   form: 'normal' | 'sic';
@@ -172,7 +172,7 @@ function loadSave(): Save | null {
 function persist() {
   try {
     S.pos = [player.pos.x, player.pos.y, player.pos.z];
-    S.tools = tools.map((t) => ({ design: t.design, uses: t.uses }));
+    S.tools = tools.map((t) => ({ design: t.design, uses: t.uses, capacity: t.stats.durability }));
     S.equipped = equipped ? tools.indexOf(equipped) : null;
     localStorage.setItem(SAVE_KEY, JSON.stringify(S));
   } catch { /* storage full or blocked: the game still runs */ }
@@ -229,7 +229,7 @@ function equip(t: Tool | null) {
   }
   const tag = $('toolTag');
   tag.style.display = t ? 'inline-block' : 'none';
-  if (t) tag.textContent = `${t.name}（${t.uses}）`;
+  if (t) tag.textContent = `${t.name}（耐久 ${t.uses}/${t.stats.durability}）`;
 }
 function addItem(id: string, n = 1) {
   S.inv[id] = (S.inv[id] ?? 0) + n;
@@ -243,16 +243,16 @@ function power(): Power {
   }
   return p;
 }
-function useTool() {
-  if (!equipped || power().source.startsWith('SiC')) return;
-  equipped.uses--;
+function useTool(contactHardness: number, combatHit = false) {
+  if (!equipped || (!combatHit && power().source.startsWith('SiC'))) return;
+  equipped.uses -= toolWear(equipped, contactHardness);
   if (equipped.uses <= 0) {
     const t = equipped;
     ui.toast(`${t.name}がこわれた。部品はもどってきた。`);
     for (const [id, count] of Object.entries(partsNeeded(t.design))) if (!ITEMS[id].binding) addItem(id, count);
     tools.splice(tools.indexOf(t), 1);
     equip(null);
-  } else $('toolTag').textContent = `${equipped.name}（${equipped.uses}回）`;
+  } else $('toolTag').textContent = `${equipped.name}（耐久 ${equipped.uses}/${equipped.stats.durability}）`;
 }
 
 const landmarks = [
@@ -286,7 +286,7 @@ const combat = encounters({
     sfx.pick();
     void gotItem(item);
   },
-  wear: useTool,
+  wear: (hardness) => useTool(hardness, true),
   retreat() {
     const start = caveGround.spawn;
     player.teleport(start.x, start.z);
@@ -872,7 +872,7 @@ async function onAction() {
     carbon.playAction('hard_break');
     sfx.pick();
     void gotItem(give);
-    if (MATERIALS[t.mat].harvest?.tier === 2) useTool();
+    if (MATERIALS[t.mat].harvest?.tier === 2) useTool(MATERIALS[t.mat].hardness);
     if (Object.values(S.inv).filter((n) => n > 0).length >= 2 && S.k.harvest) setFlag('got2');
     persist();
     return;
@@ -893,7 +893,7 @@ async function onAction() {
     sfx.crunch();
     shake = 0.25;
     breakThing(t);
-    useTool();
+    useTool(MATERIALS[t.mat].hardness);
     ui.toast(`${c.stat ? STAT_JA[c.stat] : 'こわした'}！（${p.source}）`);
     persist();
     return;
@@ -951,7 +951,7 @@ function makeFromDesign(d: ToolDesign) {
 }
 function openBag() {
   if (cutscene || fx.active) return;
-  showBag({ inv: S.inv, tool: equipped, canCreate: S.k.create, tools, onMake: makeFromDesign, onEquip: (i) => equip(i === null ? null : tools[i]) });
+  showBag({ inv: S.inv, tool: equipped, canCreate: S.k.create, tools, onMake: makeFromDesign, onEquip: (i) => { equip(i === null ? null : tools[i]); persist(); } });
 }
 
 // ── obstacle results (environment changes) ──
@@ -1176,8 +1176,10 @@ window.addEventListener('resize', () => {
 
 // ── restore a save into the world ──
 function applySave() {
-  tools = S.tools.map((t) => { const k = makeTool(t.design)!; k.uses = t.uses; return k; });
-  equip(S.equipped !== null && tools[S.equipped] ? tools[S.equipped] : null);
+  const restored = S.tools.map(restoreTool);
+  const savedEquipped = S.equipped === null ? null : restored[S.equipped];
+  tools = restored.filter((tool) => tool !== null);
+  equip(savedEquipped ?? null);
   for (const id of S.broken) { const t = world.things.find((k) => k.id === id); if (t) breakThing(t, true); }
   if (S.flags.door_open) { const c = world.colliders.list.find((k) => k.id === 'ante_door'); if (c) c.enabled = false; world.doors.ante.position.y -= 6.3; }
   if (S.form === 'sic') { carbon.setForm('sic'); $('form').style.display = 'inline-block'; }

@@ -192,9 +192,54 @@ const slotName: Record<PartSlot, string> = { head: '攻撃部分', handle: '柄'
 let design = emptyDesign();
 let slotSel: PartSlot = 'head';
 let bagSel: string | null = null;
+function durabilityLabel(stats: Tool['stats']) {
+  return `消耗しやすい箇所　${slotName[stats.limitingPart]}`;
+}
+
 export function showBag(cb: BagCallbacks) {
+  let tab: 'craft' | 'pouch' = 'craft';
+  let selectedTool = cb.tool ?? cb.tools[0];
+  const tabs = () => `<nav class="bag-tabs" aria-label="持ち物の切り替え">
+    <button type="button" id="bagCraft" aria-pressed="${tab === 'craft'}">${cb.canCreate ? '素材・CREATE' : '素材'}</button>
+    <button type="button" id="bagPouch" aria-pressed="${tab === 'pouch'}">武器ポーチ（${cb.tools.length}）</button></nav>`;
+  const zoom = () => {
+    $('previewOut').onclick = () => zoomPreview(-1);
+    $('previewIn').onclick = () => zoomPreview(1);
+  };
   const render = () => {
     unmount();
+    if (tab === 'pouch') renderPouch();
+    else renderCraft();
+    $('bagX').onclick = () => ui.close('bagWrap');
+    $('bagCraft').onclick = () => { tab = 'craft'; render(); };
+    $('bagPouch').onclick = () => { tab = 'pouch'; render(); };
+  };
+  const renderPouch = () => {
+    const choice = selectedTool;
+    $('bagPanel').innerHTML = `<button class="small close" id="bagX">とじる</button><h2>持ち物</h2>${tabs()}
+      <div class="weapon-pouch">
+      <section aria-label="所持武器" class="pouch-list">${cb.tools.map((tool, i) => `<button type="button" data-weapon="${i}" aria-pressed="${tool === choice}">
+        <strong>${tool.name}${tool === cb.tool ? '　装備中' : ''}</strong>
+        <span>${PART_SLOTS.map((slot) => tool.design[slot]).filter(Boolean).map((id) => ITEMS[id!].nameJa).join(' ＋ ')}</span>
+        <span>耐久 ${tool.uses} / ${tool.stats.durability}</span></button>`).join('') || '<p>作った武器や工具はここに入ります。</p>'}</section>
+      <section class="pouch-detail">${choice ? `<h3>${choice.name}</h3><div id="bagView" class="pv"></div>
+        <div class="craft-zoom"><button class="small" id="previewOut" aria-label="縮小">−</button><button class="small" id="previewIn" aria-label="拡大">＋</button></div>
+        <p>耐久 ${choice.uses} / ${choice.stats.durability} <meter aria-label="残り耐久" min="0" max="${choice.stats.durability}" low="${Math.ceil(choice.stats.durability * 0.25)}" value="${choice.uses}"></meter></p>
+        <p>${durabilityLabel(choice.stats)}<br>攻撃力 ${choice.stats.attack} ／ 速さ ${choice.stats.attackSpeed} ／ リーチ ${choice.stats.reach} m ／ 重量 ${choice.stats.weight} kg</p>
+        <p class="note">耐久はゲーム内の指標。硬い相手に当たると消耗が増えます。</p>
+        <button class="bigbtn" id="equipWeapon" ${cb.tool === choice ? 'disabled' : ''}>${cb.tool === choice ? '装備中' : '装備する'}</button>` : ''}
+        <button class="small" id="unequipWeapon" ${cb.tool ? '' : 'disabled'}>素手に戻す</button></section></div>`;
+    $('bagPanel').querySelectorAll<HTMLButtonElement>('[data-weapon]').forEach((button) => {
+      button.onclick = () => { selectedTool = cb.tools[Number(button.dataset.weapon)]; render(); };
+    });
+    if (choice) {
+      mountPreview($('bagView'), toolMesh(choice.design));
+      zoom();
+      $('equipWeapon').onclick = () => { cb.onEquip(cb.tools.indexOf(choice)); cb.tool = choice; render(); };
+    }
+    $('unequipWeapon').onclick = () => { cb.onEquip(null); cb.tool = null; render(); };
+  };
+  const renderCraft = () => {
     const ids = Object.keys(cb.inv).filter((id) => cb.inv[id] > 0 && ITEMS[id]);
     if (bagSel && !ids.includes(bagSel)) bagSel = null;
     const needed = partsNeeded(design);
@@ -206,23 +251,20 @@ export function showBag(cb: BagCallbacks) {
     const slots = PART_SLOTS.map((slot) => `<button type="button" class="slot ${slotSel === slot ? 'sel' : ''}" data-slot="${slot}"><span class="k">${slotName[slot]}</span><span class="v">${design[slot] ? ITEMS[design[slot]!].nameJa : '選ぶ'}</span></button>`).join('');
     const selected = bagSel ? ITEMS[bagSel] : null;
     const canPreview = cb.canCreate && (!!design.kind || PART_SLOTS.some((slot) => design[slot] !== null));
-    $('bagPanel').innerHTML = `<button class="small close" id="bagX">とじる</button><h2>${cb.canCreate ? '持ち物・CREATE' : '持ち物'}</h2>
+    $('bagPanel').innerHTML = `<button class="small close" id="bagX">とじる</button><h2>${cb.canCreate ? '持ち物・CREATE' : '持ち物'}</h2>${tabs()}
       ${cb.canCreate ? `<label class="craft-type">種類 <select id="craftKind"><option value="">工具（自由に組み合わせる）</option>${Object.entries(WEAPONS).map(([kind, def]) => `<option value="${kind}" ${design.kind === kind ? 'selected' : ''}>${def.label}</option>`).join('')}</select></label>` : ''}
       <div class="craft-layout"><section class="craft-supplies"><h3>所持素材</h3><div class="grid">${items}</div></section>
       <section class="craft-preview"><h3>${canPreview ? '製作プレビュー' : selected?.nameJa ?? '3Dプレビュー'}</h3><div id="bagView" class="pv"></div><div class="craft-zoom"><button class="small" id="previewOut" aria-label="縮小">−</button><button class="small" id="previewIn" aria-label="拡大">＋</button></div>
       ${cb.canCreate ? `<div class="slots">${slots}</div><button class="small" id="bToSlot" ${bagSel && compatible(slotSel, bagSel) ? '' : 'disabled'}>選んだ素材を${slotName[slotSel]}に入れる</button>` : ''}</section>
       <section class="craft-stats"><h3>性能と必要素材</h3>
-      ${st ? `<strong>${toolName(design, st)}</strong><dl><dt>攻撃力</dt><dd>${st.attack}</dd><dt>攻撃速度</dt><dd>${st.attackSpeed}</dd><dt>耐久</dt><dd>${st.durability}回</dd><dt>重量</dt><dd>${st.weight} kg</dd><dt>リーチ</dt><dd>${st.reach} m</dd><dt>破壊能力</dt><dd>切 ${st.cut}／突 ${st.pierce}／打 ${st.impact}</dd></dl>${st.effect ? `<p>${st.effect}</p>` : ''}` : '<p class="note">部品を組み合わせると性能が出ます。</p>'}
+      ${st ? `<strong>${toolName(design, st)}</strong><dl><dt>攻撃力</dt><dd>${st.attack}</dd><dt>攻撃速度</dt><dd>${st.attackSpeed}</dd><dt>耐久</dt><dd>${st.durability}</dd><dt>重量</dt><dd>${st.weight} kg</dd><dt>リーチ</dt><dd>${st.reach} m</dd><dt>破壊能力</dt><dd>切 ${st.cut}／突 ${st.pierce}／打 ${st.impact}</dd></dl><p>${durabilityLabel(st)}</p>${st.effect ? `<p>${st.effect}</p>` : ''}` : '<p class="note">部品を組み合わせると性能が出ます。</p>'}
       <ul>${Object.entries(needed).map(([id, n]) => `<li class="${(cb.inv[id] ?? 0) < n ? 'shortage' : ''}">${ITEMS[id].nameJa} ${n} / ${cb.inv[id] ?? 0}</li>`).join('')}</ul>
-      ${cb.canCreate ? `<button class="bigbtn" id="bMake" ${st && sufficient ? '' : 'disabled'}>つくる</button> <button class="small" id="bClear">枠を空にする</button>` : ''}</section></div>
-      <div class="note">装備 ${cb.tools.map((t, i) => `<button class="item" data-eq="${i}">${t.name}${cb.tool === t ? ' ✔' : ''}（${t.uses}回）</button>`).join(' ')} <button class="item" data-eq="-1">素手</button></div>`;
+      ${cb.canCreate ? `<button class="bigbtn" id="bMake" ${st && sufficient ? '' : 'disabled'}>つくる</button> <button class="small" id="bClear">枠を空にする</button>` : ''}</section></div>`;
     const panel = $('bagPanel');
     const preview = $('bagView');
-    $('bagX').onclick = () => ui.close('bagWrap');
     if (canPreview) mountPreview(preview, toolMesh(design));
     else if (selected) void mount(preview, { kind: 'item', id: selected.id }, true);
-    $('previewOut').onclick = () => zoomPreview(-1);
-    $('previewIn').onclick = () => zoomPreview(1);
+    zoom();
     const chooseKind = document.getElementById('craftKind') as HTMLSelectElement | null;
     if (chooseKind) chooseKind.onchange = () => {
       design = emptyDesign(chooseKind.value ? chooseKind.value as WeaponKind : undefined);
@@ -258,9 +300,8 @@ export function showBag(cb: BagCallbacks) {
     });
     const to = document.getElementById('bToSlot');
     if (to) to.onclick = () => { if (bagSel) assign(slotSel, bagSel); };
-    panel.querySelectorAll<HTMLElement>('[data-eq]').forEach((el) => (el.onclick = () => { const i = Number(el.dataset.eq); cb.onEquip(i < 0 ? null : i); cb.tool = i < 0 ? null : cb.tools[i]; render(); }));
     const mk = document.getElementById('bMake');
-    if (mk) mk.onclick = () => { const made = cb.onMake({ ...design }); if (!made) return; cb.tool = made; design = emptyDesign(design.kind); slotSel = 'head'; render(); };
+    if (mk) mk.onclick = () => { const made = cb.onMake({ ...design }); if (!made) return; cb.tool = selectedTool = made; design = emptyDesign(design.kind); slotSel = 'head'; render(); };
     const cl = document.getElementById('bClear');
     if (cl) cl.onclick = () => { design = emptyDesign(design.kind); slotSel = 'head'; render(); };
   };

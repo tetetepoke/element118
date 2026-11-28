@@ -26,7 +26,7 @@ interface CombatHost {
   held(): THREE.Object3D | null;
   animation(length: number): void;
   loot(item: string): void;
-  wear(): void;
+  wear(hardness: number): void;
   retreat(): void;
   save(): void;
 }
@@ -326,7 +326,7 @@ export function encounters(host: CombatHost) {
         const style = swingTool?.design.kind ? WEAPONS[swingTool.design.kind].stat : swingTool ? bestStat(swingTool.stats) : 'impact';
         const power = Math.max(2, (swingTool?.stats.attack ?? (host.form() === 'sic' ? 10 : 5)) - e.def.armor);
         e.hp = Math.max(0, e.hp - Math.round(power * (e.def.weakness === style ? 1.45 : 1) + (swingTool?.design.head === 'cave_fang' && e.def.armor > 1 ? 2 : 0)));
-        if (swingTool) host.wear();
+        if (swingTool) host.wear(e.def.shellHardness);
         if (e.hp === 0) {
           defeated()[e.id] = { remaining: e.def.respawn, drops: e.def.drops.filter(([, odds]) => Math.random() < odds).map(([item]) => item), x: p.x, z: p.z };
           e.phase = 'idle'; e.timer = 0; e.area.visible = false;

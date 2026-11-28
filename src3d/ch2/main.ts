@@ -30,7 +30,7 @@ import { viewerStats } from '../ch1/itemViewer';
 import { sfx, startAudio } from '../ch1/audio';
 import { ITEMS, MATERIALS, ELEMENTS, type ElementSymbol } from '../ch1/game/materials';
 import { newKnowledge, noteScan, level, type KnowledgeState } from '../ch1/game/knowledge';
-import { makeTool, toolMesh, partsNeeded, craftFromInventory, adjustWeaponCarry, type Tool, type ToolDesign } from '../ch1/game/craft';
+import { restoreTool, toolWear, type SavedTool, toolMesh, partsNeeded, craftFromInventory, adjustWeaponCarry, type Tool, type ToolDesign } from '../ch1/game/craft';
 import { canBreak, canHarvest, HANDS, STAT_JA, type Power } from '../ch1/game/interact';
 import { ProceduralCupra, buildCuOverlay } from './world/actors';
 
@@ -139,7 +139,7 @@ interface Save extends EncounterSave {
   v: 1;
   flags: Record<string, boolean>;
   inv: Record<string, number>;
-  tools: { design: ToolDesign; uses: number }[];
+  tools: SavedTool[];
   equipped: number | null;
   k: KnowledgeState;
   form: Form;
@@ -174,7 +174,7 @@ function loadSave(): Save | null {
 function persist() {
   try {
     S.pos = [player.pos.x, player.pos.y, player.pos.z];
-    S.tools = tools.map((t) => ({ design: t.design, uses: t.uses }));
+    S.tools = tools.map((t) => ({ design: t.design, uses: t.uses, capacity: t.stats.durability }));
     S.equipped = equipped ? tools.indexOf(equipped) : null;
     localStorage.setItem(SAVE_KEY, JSON.stringify(S));
   } catch { /* storage blocked: the game still runs */ }
@@ -210,7 +210,7 @@ function equip(t: Tool | null) {
   if (t) { handMesh = toolMesh(t.design); carbon.rightHand.add(handMesh); }
   const tag = $('toolTag');
   tag.style.display = t ? 'inline-block' : 'none';
-  if (t) tag.textContent = `${t.name}（${t.uses}）`;
+  if (t) tag.textContent = `${t.name}（耐久 ${t.uses}/${t.stats.durability}）`;
 }
 const addItem = (id: string, n = 1) => { S.inv[id] = (S.inv[id] ?? 0) + n; };
 const has = (id: string, n = 1) => (S.inv[id] ?? 0) >= n;
@@ -220,16 +220,16 @@ function power(): Power {
   if (S.form === 'sic' && 9 > p.impact) p = { ...p, impact: 9, source: 'SiC FORM（HARD BREAK）' };
   return p;
 }
-function useTool() {
-  if (!equipped || power().source.startsWith('SiC')) return;
-  equipped.uses--;
+function useTool(contactHardness: number, combatHit = false) {
+  if (!equipped || (!combatHit && power().source.startsWith('SiC'))) return;
+  equipped.uses -= toolWear(equipped, contactHardness);
   if (equipped.uses <= 0) {
     const t = equipped;
     ui.toast(`${t.name}がこわれた。部品はもどってきた。`);
     for (const [id, count] of Object.entries(partsNeeded(t.design))) if (!ITEMS[id].binding) addItem(id, count);
     tools.splice(tools.indexOf(t), 1);
     equip(null);
-  } else $('toolTag').textContent = `${equipped.name}（${equipped.uses}回）`;
+  } else $('toolTag').textContent = `${equipped.name}（耐久 ${equipped.uses}/${equipped.stats.durability}）`;
 }
 
 const landmarks = [
@@ -265,7 +265,7 @@ const combat = encounters({
     sfx.pick();
     void gotItem(item);
   },
-  wear: useTool,
+  wear: (hardness) => useTool(hardness, true),
   retreat() {
     const start = mineGround.spawn;
     player.teleport(start.x, start.z);
@@ -896,7 +896,7 @@ async function onAction() {
     sfx.crunch();
     shake = 0.25;
     breakThing(t);
-    useTool();
+    useTool(MATERIALS[t.mat].hardness);
     ui.toast(`${c.stat ? STAT_JA[c.stat] : 'こわした'}！（${p.source}）`);
     persist();
     return;
@@ -935,7 +935,7 @@ function makeFromDesign(d: ToolDesign) {
 }
 function openBag() {
   if (caveMap.open || cutscene || fx.active) return;
-  showBag({ inv: S.inv, tool: equipped, canCreate: true, tools, onMake: makeFromDesign, onEquip: (i) => equip(i === null ? null : tools[i]) });
+  showBag({ inv: S.inv, tool: equipped, canCreate: true, tools, onMake: makeFromDesign, onEquip: (i) => { equip(i === null ? null : tools[i]); persist(); } });
 }
 const shards: { m: THREE.Object3D; t: number }[] = [];
 function breakThing(t: Thing, instant = false) {
@@ -1070,8 +1070,10 @@ for (const ev of ['gesturestart', 'gesturechange', 'dblclick']) document.addEven
 window.addEventListener('resize', () => { renderer.setSize(window.innerWidth, window.innerHeight); camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); });
 
 function applySave() {
-  tools = S.tools.map((t) => { const k = makeTool(t.design)!; k.uses = t.uses; return k; });
-  equip(S.equipped !== null && tools[S.equipped] ? tools[S.equipped] : null);
+  const restored = S.tools.map(restoreTool);
+  const savedEquipped = S.equipped === null ? null : restored[S.equipped];
+  tools = restored.filter((tool) => tool !== null);
+  equip(savedEquipped ?? null);
   for (const id of S.broken) { const t = world.things.find((k) => k.id === id); if (t) breakThing(t, true); }
   if (S.form === 'sic') { carbon.setForm('sic'); $('form').textContent = 'SiC FORM'; $('form').style.display = 'inline-block'; }
   if (S.form === 'cu') { cuOverlay.visible = true; $('form').textContent = 'Cu LINK'; $('form').style.display = 'inline-block'; }
