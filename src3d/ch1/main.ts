@@ -96,7 +96,7 @@ const crystalLight = new THREE.PointLight(0x5ab8ff, 6, 7, 1.6);
 scene.add(crystalLight);
 
 // ── characters ──
-const CARBON_SCALE = 0.28;
+const CARBON_SCALE = 0.39;
 const carbon = new ProceduralCarbon({ smooth: true, scale: CARBON_SCALE });
 scene.add(carbon.root);
 const player = new PlayerController(carbon, world.colliders);
