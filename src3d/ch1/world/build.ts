@@ -652,6 +652,21 @@ export function buildWorld() {
     root.add(b);
   }
 
+  // Optional, one-time pickups tucked off the main route.
+  const cacheWood = std(0x68452c);
+  const cacheMarker = std(0xd9bf79, { emissive: 0x966424, emissiveIntensity: 0.8 });
+  const cache = (id: string, x: number, z: number, mat: string, item: string) => {
+    const y = g(x, z);
+    const obj = box(id, x, z, 0.65, 0.26, 0.45, cacheWood, { y, rot: 0.4, collide: false });
+    const marker = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.035, 0.13), cacheMarker);
+    marker.position.y = 0.14;
+    obj.add(marker);
+    things.push({ id, kind: 'pick', mat, pos: obj.position, r: 1.05, obj, give: [item] });
+  };
+  cache('cache_dump', 1, 110, 'scrap_metal', 'pipe');
+  cache('cache_city', 25, 22, 'stone', 'sharp_stone');
+  cache('cache_fungus', -67, -77, 'fiber', 'fiber');
+
   return {
     root, colliders, things, lights, npcs, crawlers, snails, hakobi: hak, crane, craneArm: arm, wakeRoot,
     doors: { gateL: doorL, gateR: doorR, emblem, socket, farLights, ante: door },
