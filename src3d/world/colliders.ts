@@ -180,8 +180,6 @@ export class ColliderWorld {
     for (const c of this.around(pos.x, pos.z, rad + 0.01)) {
       if (!this.solid(c)) continue;
       if (feetY + step >= c.top || feetY + h <= c.bottom) continue; // standing on it / stepping up / passing under
-      // only the top of the head reaches its underside while the body is under it: a ceiling, not a wall
-      if (c.bottom > feetY + h - 0.12 && this.contains(c, pos.x, pos.z, -0.25)) continue;
       let nx: number, nz: number;
       if (c.kind === 'cyl') {
         const dx = pos.x - c.x, dz = pos.z - c.z;
@@ -288,7 +286,7 @@ export class ColliderWorld {
       if (a > 0 || b > 0) hit = true;
       if (a < 1e-4 && b < 1e-4) break;
     }
-    return { hit, nx: acc.nx, nz: acc.nz, residual: hit ? this.penetration(pos.x, pos.z, feetY, rad, h, step, terrainStep) : 0 };
+    return { hit, nx: acc.nx, nz: acc.nz, residual: this.penetration(pos.x, pos.z, feetY, rad, h, step, terrainStep) };
   }
 
   /** Old single-call API (kept for callers outside the player): resolve without terrain. */

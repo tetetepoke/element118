@@ -142,7 +142,7 @@ export class PlayerController {
       const c = this.climb;
       c.t += dt;
       const p = Math.min(1, c.t / c.len);
-      const up = Math.min(1, p / 0.65), over = Math.max(0, (p - 0.45) / 0.55);
+      const up = Math.min(1, p / 0.65), over = Math.max(0, (p - 0.65) / 0.35);
       this.pos.set(
         c.from.x + (c.to.x - c.from.x) * over,
         c.from.y + (c.to.y - c.from.y) * (1 - (1 - up) * (1 - up)),
@@ -237,6 +237,7 @@ export class PlayerController {
     const p2 = { x: 0, z: 0 };
     let blocked = 0, inside = 0;
     for (let i = 0; i < n; i++) {
+      const fromX = this.pos.x, fromZ = this.pos.z;
       const sx = stepX / n, sz = stepZ / n;
       if (!tryMove(sx, sz)) {
         const okX = tryMove(sx, 0), okZ = tryMove(0, sz);
@@ -244,6 +245,15 @@ export class PlayerController {
       }
       p2.x = this.pos.x; p2.z = this.pos.z;
       const r = this.colliders.resolve(p2, this.pos.y, T.radius, T.height, sideStep, sideStep);
+      if (r.residual > 0.02) {
+        const previous = this.colliders.penetration(fromX, fromZ, this.pos.y, T.radius, T.height, sideStep);
+        if (previous < r.residual) {
+          this.pos.x = fromX; this.pos.z = fromZ;
+          inside = previous;
+          blocked++;
+          continue;
+        }
+      }
       this.pos.x = p2.x; this.pos.z = p2.z;
       inside = r.residual;
     }
@@ -253,7 +263,6 @@ export class PlayerController {
       const made = Math.hypot(this.pos.x - ox, this.pos.z - oz) / dt;
       if (made < this.speed * 0.3) this.speed = Math.max(1, this.speed - T.decel * 0.6 * dt);
     }
-    this.penetration = inside;
     const half = getGround().half;
     this.pos.x = THREE.MathUtils.clamp(this.pos.x, -half + 4, half - 4);
     this.pos.z = THREE.MathUtils.clamp(this.pos.z, -half + 4, half - 4);
@@ -303,6 +312,13 @@ export class PlayerController {
         }
       }
     }
+
+    // Landing, stepping down or rising can put the body alongside a solid that was clear at prevY.
+    // Recheck at the final height before drawing the player or saving the position as safe.
+    if (this.pos.y !== prevY || inside > 0.02) {
+      inside = this.colliders.resolve(this.pos, this.pos.y, T.radius, T.height, sideStep, sideStep).residual;
+    }
+    this.penetration = inside;
 
     // ── safety net: remember where it was free; if the body stays inside something (or ends up under
     //    the terrain) put it back there ──
@@ -364,21 +380,42 @@ export class PlayerController {
 
   /** Climb onto a ledge in front if it is within reach and flat on top. */
   private tryLedge(fwd: THREE.Vector3, maxRise: number) {
-    const T = TUNING;
+    const T = TUNING, C = this.colliders;
     for (const dist of [0.55, 0.85]) {
       const ax = this.pos.x + fwd.x * dist, az = this.pos.z + fwd.z * dist;
-      const top = this.colliders.topAt(ax, az);
+      const top = C.topAt(ax, az);
       const rise = top - this.pos.y;
       if (rise <= T.step || rise > maxRise) continue;
-      const bx = this.pos.x + fwd.x * (dist + 0.5), bz = this.pos.z + fwd.z * (dist + 0.5);
-      const top2 = this.colliders.topAt(bx, bz);
-      if (Math.abs(top2 - top) > 0.4) continue;
-      this.climb = { t: 0, len: 0.32 + rise * 0.18, from: this.pos.clone(), to: new THREE.Vector3(bx, top2, bz) };
-      this.vel.set(0, 0, 0);
-      this.takeoffT = 0;
-      return true;
+      // A narrow step may only have room to land near its front edge.
+      for (const extra of [0.5, 0.3, 0.15, 0]) {
+        const bx = this.pos.x + fwd.x * (dist + extra), bz = this.pos.z + fwd.z * (dist + extra);
+        const top2 = C.topAt(bx, bz);
+        if (Math.abs(top2 - top) > 0.4 || !this.ledgePathClear(bx, top2, bz, dist + extra)) continue;
+        this.climb = { t: 0, len: 0.32 + rise * 0.18, from: this.pos.clone(), to: new THREE.Vector3(bx, top2, bz) };
+        this.vel.set(0, 0, 0);
+        this.takeoffT = 0;
+        return true;
+      }
     }
     return false;
+  }
+
+  /** The mantle animation rises at the starting point and then moves across at the landing height. */
+  private ledgePathClear(x: number, y: number, z: number, distance: number) {
+    const T = TUNING, C = this.colliders;
+    const from = this.pos;
+    const terrain = getGround();
+    const clear = (px: number, py: number, pz: number) => C.penetration(px, pz, py, T.radius, T.height, 0, T.step) < 0.02
+      && py + T.height <= (terrain.ceilingAt?.(px, pz) ?? Infinity);
+    const upSteps = Math.ceil((y - from.y) / T.subStep);
+    for (let i = 1; i <= upSteps; i++) {
+      if (!clear(from.x, THREE.MathUtils.lerp(from.y, y, i / upSteps), from.z)) return false;
+    }
+    const overSteps = Math.ceil(distance / T.subStep);
+    for (let i = 1; i <= overSteps; i++) {
+      if (!clear(THREE.MathUtils.lerp(from.x, x, i / overSteps), y, THREE.MathUtils.lerp(from.z, z, i / overSteps))) return false;
+    }
+    return true;
   }
 
   private setState(s: MoveState, speed: number) {
