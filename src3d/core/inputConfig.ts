@@ -41,6 +41,7 @@ export const INPUT_CONFIG = {
     Run: ['ShiftLeft', 'ShiftRight'],
     ToolPrev: ['KeyZ'],
     ToolNext: ['KeyX'],
+    ActionR: ['KeyG'],
   } as Partial<Record<ActionName, string[]>>,
   moveKeys: { up: ['KeyW', 'ArrowUp'], down: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'] },
 

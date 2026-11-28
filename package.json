@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "validate": "tsx scripts/validate-data.ts",
-    "test": "tsx scripts/test-bonding.ts && node --import tsx --test scripts/test-collision.ts",
+    "test": "tsx scripts/test-bonding.ts && node --import tsx --test scripts/test-collision.ts scripts/test-weapons.ts",
     "typecheck": "tsc --noEmit",
     "build": "npm run validate && npm run test && tsc --noEmit && vite build",
     "preview": "vite preview"

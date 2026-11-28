@@ -323,7 +323,7 @@ export class BodyAnimator {
       const a = this.action;
       a.t += dt;
       const q = a.t / a.len;
-      if (a.name === 'hard_break') {
+      if (a.name === 'hard_break' || a.name === 'combat') {
         const wind = q < 0.4;
         const punch = wind ? 0 : Math.max(0, 1 - (q - 0.4) / 0.6);
         T.armR = wind ? 0.9 * (q / 0.4) : -1.65 * punch;
@@ -675,8 +675,8 @@ export class ProceduralCarbon implements CharacterVisual {
     return this.crystal.getWorldPosition(out);
   }
 
-  playAction(name: string) {
-    return this.anim.play(name, name === 'hard_break' ? 0.55 : 0.8);
+  playAction(name: string, duration?: number) {
+    return this.anim.play(name, duration ?? (name === 'hard_break' ? 0.55 : 0.8));
   }
 
   private flashT = 0;
