@@ -452,9 +452,14 @@ function maskTexture(detailed = false) {
   g.fillStyle = '#3a2a2e';
   if (detailed) {
     for (const x of [84, 167]) {
-      g.fillStyle = '#3a2a2e';
+      // Dark apertures with a chamfer around each opening.
+      g.fillStyle = '#a18a72';
       g.beginPath();
-      g.ellipse(x, 159, 13, 17, 0, 0, Math.PI * 2);
+      g.ellipse(x, 159, 16, 19, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#29242b';
+      g.beginPath();
+      g.ellipse(x, 158, 12, 15, 0, 0, Math.PI * 2);
       g.fill();
       g.fillStyle = '#fff9ec';
       g.beginPath();
@@ -510,7 +515,8 @@ export class ProceduralCarbon implements CharacterVisual {
     lock.position.set(0.16, 0.26, 0.14);
     lock.rotation.set(0.3, 0, -0.6);
     // the mask: face plate with a little fox-like chin, C and 6, curved horns with red tips
-    const maskG = new THREE.SphereGeometry(0.335, 24, 18, Math.PI * 0.1, Math.PI * 0.8, Math.PI * 0.2, Math.PI * 0.62);
+    const maskColumns = 24, maskRows = 18;
+    const maskG = new THREE.SphereGeometry(0.335, maskColumns, maskRows, Math.PI * 0.1, Math.PI * 0.8, Math.PI * 0.2, Math.PI * 0.62);
     const mp = maskG.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < mp.count; i++) {
       const y = mp.getY(i), x = mp.getX(i);
@@ -522,8 +528,36 @@ export class ProceduralCarbon implements CharacterVisual {
     }
     maskG.computeVertexNormals();
     const mask = mesh(maskG, new THREE.MeshStandardMaterial({ map: maskTexture(opts.smooth), roughness: opts.smooth ? 0.59 : 0.45, side: THREE.DoubleSide, ...(opts.smooth ? surfaceBump('ceramic', 0.014) : {}) }), b.head);
-    mask.position.set(0, -0.01, 0.045);
+    mask.position.set(0, -0.01, detailed ? 0.063 : 0.045);
     mask.scale.set(detailed ? 1.07 : 1.05, detailed ? 1.06 : 1.08, 1.12);
+    if (detailed) {
+      const edge: THREE.Vector3[] = [];
+      const addEdgePoint = (col: number, row: number) => {
+        edge.push(new THREE.Vector3().fromBufferAttribute(mp, row * (maskColumns + 1) + col));
+      };
+      for (let col = 0; col < maskColumns; col++) addEdgePoint(col, 0);
+      for (let row = 0; row < maskRows; row++) addEdgePoint(maskColumns, row);
+      for (let col = maskColumns; col > 0; col--) addEdgePoint(col, maskRows);
+      for (let row = maskRows; row > 0; row--) addEdgePoint(0, row);
+      const rim = new THREE.CatmullRomCurve3(edge, true);
+      mesh(new THREE.TubeGeometry(rim, edge.length, 0.012, 5, true),
+        std(0xb79a72, { roughness: 0.75 }), mask);
+
+      const strapMat = std(0x624234, { roughness: 0.85, ...surfaceBump('leather', 0.012) });
+      const studMat = std(0xc39a55, { metalness: 0.42, roughness: 0.51 });
+      for (const side of [-1, 1]) {
+        const strap = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(side * 0.349, 0.018, 0.173),
+          new THREE.Vector3(side * 0.357, 0.029, 0.08),
+          new THREE.Vector3(side * 0.319, 0.047, -0.154),
+          new THREE.Vector3(side * 0.183, 0.061, -0.291),
+          new THREE.Vector3(0, 0.065, -0.338),
+        ]);
+        mesh(new THREE.TubeGeometry(strap, 12, 0.018, 5, false), strapMat, b.head);
+        const stud = mesh(new THREE.SphereGeometry(0.022, 8, 6), studMat, b.head);
+        stud.position.set(side * 0.349, 0.018, 0.177);
+      }
+    }
     const hornM = std(0xf6f1e8, { roughness: 0.35 });
     for (const sx of [1, -1]) {
       const horn = mesh(bentCone(0.055, 0.3, -0.12, 8), hornM, b.head);
